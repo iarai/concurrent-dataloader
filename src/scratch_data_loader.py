@@ -15,11 +15,7 @@ class ScratchDataLoader(Dataset):
     def __init__(
         self,
         imagenet_path: str,
-        mode,
-        batch_size: int,
-        shuffle: bool,
-        num_workers: int,
-        pin_memory: bool,
+        mode
     ):
         self.mode = mode
         self.image_paths = []
@@ -44,7 +40,7 @@ class ScratchDataLoader(Dataset):
         [self.image_paths.append(Path(i)) for i in str_paths]
 
     def get_random_item(self):
-        rn = random.randint(0, self.__len__())
+        rn = random.randint(0, self.__len__()-1)
         image = self.__getitem__(rn)
         return image
 

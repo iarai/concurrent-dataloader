@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#s3 cred
+s3_credentials.json
+
 # C extensions
 *.so
 
