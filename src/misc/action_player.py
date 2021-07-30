@@ -1,5 +1,6 @@
 from misc.time_helper import TimeHelper
 
+
 class ActionPlayer:
     def __init__(self):
         self.stopwatch = TimeHelper()

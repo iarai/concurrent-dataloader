@@ -7,6 +7,7 @@ from data_loader.scratch_data_loader import ScratchDataLoader
 
 IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 
+
 def test_data_loader(data_loader_instance, skip_indexing=False):
     action_player = ActionPlayer()
 

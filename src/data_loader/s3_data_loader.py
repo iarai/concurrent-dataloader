@@ -1,7 +1,6 @@
 import json
 import re
 import random
-from pathlib import Path
 
 import boto3
 from PIL import Image

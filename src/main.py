@@ -1,8 +1,8 @@
 import argparse
 
-
-from benchmark.data_loader import test_s3, test_scratch 
+from benchmark.data_loader import test_s3, test_scratch
 from benchmark.image_loader import test_tensor_loading, load_image, load_random_on_gpu, load_random_to_gpu
+
 
 def handle_arguments():
     parser = argparse.ArgumentParser()
@@ -10,16 +10,16 @@ def handle_arguments():
                         help="An option to benchmark (s3, scratch, random_gpu, random_to_gpu, random_image)",
                         default="random_gpu")
     parser.add_argument("-m", "--dataset",
-                    help="Default dataset (val or train)",
-                    default="val")
+                        help="Default dataset (val or train)",
+                        default="val")
     return parser
 
 
 if __name__ == "__main__":
     # interpret arguments
-    parser = handle_arguments() 
+    parser = handle_arguments()
     args = parser.parse_args()
-    
+
     # load dataset
     dataset = args.dataset
 
@@ -38,4 +38,3 @@ if __name__ == "__main__":
         test_tensor_loading(load_image, True, 200)
     else:
         parser.print_help()
-

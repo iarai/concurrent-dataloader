@@ -7,15 +7,14 @@ from PIL import Image
 from torch.utils.data.dataset import Dataset
 
 IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
-IMAGENET_PATH_GLUSTER = "/scratch/imagenet"
 FILENAME = "file_index.json"
 
 
 class ScratchDataLoader(Dataset):
     def __init__(
-        self,
-        imagenet_path: str,
-        mode
+            self,
+            imagenet_path: str,
+            mode
     ):
         self.mode = mode
         self.image_paths = []
@@ -40,7 +39,7 @@ class ScratchDataLoader(Dataset):
         [self.image_paths.append(Path(i)) for i in str_paths]
 
     def get_random_item(self):
-        rn = random.randint(0, self.__len__()-1)
+        rn = random.randint(0, self.__len__() - 1)
         image = self.__getitem__(rn)
         return image
 
