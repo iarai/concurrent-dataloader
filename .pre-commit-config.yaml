@@ -21,7 +21,7 @@ repos:
     rev: 19.10b0
     hooks:
       - id: black
-        args: [ --line-length, '160',
+        args: [ --line-length, '120',
         ]
 
 

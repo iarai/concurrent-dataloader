@@ -1,5 +1,8 @@
 import time
 from collections import defaultdict
+from typing import Any
+from typing import Dict
+from typing import Union
 
 import numpy as np
 
@@ -7,16 +10,16 @@ PRECISION = 6
 
 
 class TimeHelper:
-    def __init__(self):
+    def __init__(self) -> None:
         self.recordings = defaultdict(list)
 
-    def record(self, name: str):
+    def record(self, name: str) -> None:
         self.recordings[name].append(time.time())
 
-    def reset(self):
+    def reset(self) -> None:
         self.recordings.clear()
 
-    def get_results(self, name: str, verbose=True):
+    def get_results(self, name: str, verbose: bool = True) -> Dict[str, Union[Any, Any]]:
         diffs = []
         action_counter = 0
         for i in self.recordings:

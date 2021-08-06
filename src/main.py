@@ -10,9 +10,14 @@ from benchmark.image_loader import test_tensor_loading
 from misc.mp_action_player import MPActionPlayer
 
 
-def handle_arguments():
+def handle_arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument("-b", "--benchmark", help="An option to benchmark (s3, scratch, random_gpu, random_to_gpu, random_image)", default="random_gpu")
+    parser.add_argument(
+        "-b",
+        "--benchmark",
+        help="An option to benchmark (s3, scratch, random_gpu, random_to_gpu, random_image)",
+        default="random_gpu",
+    )
     parser.add_argument("-m", "--dataset", help="Default dataset (val or train)", default="val")
     return parser
 

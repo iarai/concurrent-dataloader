@@ -1,14 +1,16 @@
+from typing import Callable
+
 from misc.time_helper import TimeHelper
 
 
 class ActionPlayer:
-    def __init__(self):
+    def __init__(self) -> None:
         self.stopwatch = TimeHelper()
 
-    def reset(self):
+    def reset(self) -> None:
         self.stopwatch.reset()
 
-    def benchmark(self, action_name, action, repeat):
+    def benchmark(self, action_name: str, action: Callable, repeat: int) -> None:
         for i in range(repeat):
             self.stopwatch.record(action_name + "_" + str(i))
             action()
