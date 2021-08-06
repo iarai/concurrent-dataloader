@@ -12,4 +12,4 @@ or to see help:
 
 #### Todo-reminder
 
- [ ] - Check out `https://docs.nvidia.com/deeplearning/dali/user-guide/docs/examples/frameworks/pytorch/pytorch-basic_example.html`
+- [ ] - Check out `https://docs.nvidia.com/deeplearning/dali/user-guide/docs/examples/frameworks/pytorch/pytorch-basic_example.html`

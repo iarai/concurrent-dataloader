@@ -1,3 +1,4 @@
+#! /usr/bin/python3
 import argparse
 
 from benchmark.data_loader import test_s3
@@ -6,6 +7,7 @@ from benchmark.image_loader import load_image
 from benchmark.image_loader import load_random_on_gpu
 from benchmark.image_loader import load_random_to_gpu
 from benchmark.image_loader import test_tensor_loading
+from misc.mp_action_player import MPActionPlayer
 
 
 def handle_arguments():
@@ -38,3 +40,7 @@ if __name__ == "__main__":
         test_tensor_loading(load_image, True, 200)
     else:
         parser.print_help()
+
+    test_tensor_loading(load_image, True, 200)
+    action_player = MPActionPlayer(num_workers=8, pool_size=4)
+    test_tensor_loading(load_image, True, 200, action_player)

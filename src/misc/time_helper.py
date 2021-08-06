@@ -16,7 +16,7 @@ class TimeHelper:
     def reset(self):
         self.recordings.clear()
 
-    def get_results(self, name: str, repeat: int):
+    def get_results(self, name: str, verbose=True):
         diffs = []
         action_counter = 0
         for i in self.recordings:
@@ -25,8 +25,12 @@ class TimeHelper:
                 diffs.append(diff)
                 action_counter = action_counter + 1
         mean_indexing_time = np.round(np.mean(np.array(diffs)), PRECISION)
-        print(
-            f"Action (repeated {repeat:10}): {name:15} "
-            f"Mean action time: {mean_indexing_time:10}, "
-            f"Total: {np.round(action_counter / mean_indexing_time, PRECISION):10} files/s"
-        )
+        total = np.round(action_counter / mean_indexing_time, PRECISION)
+        if verbose:
+            print(
+                f"Action (repeated {action_counter:10}): {name:15} "
+                f"Mean action time: {mean_indexing_time:10}, "
+                f"Total: {total:10} files/s "
+                f"min,max = ({max(diffs), min(diffs)})"
+            )
+        return {"total": total, "mean": mean_indexing_time, "min": min(diffs), "max": max(diffs)}

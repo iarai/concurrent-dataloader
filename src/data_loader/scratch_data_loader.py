@@ -17,7 +17,7 @@ class ScratchDataLoader(Dataset):
         self.__imagenet_path = Path(os.path.join(imagenet_path, mode))
 
     def index_all(self):
-        self.image_paths = list(self.__imagenet_path.rglob(f"**/*.JPEG"))
+        self.image_paths = list(self.__imagenet_path.rglob("**/*.JPEG"))
 
     def save_index(self):
         str_paths = []

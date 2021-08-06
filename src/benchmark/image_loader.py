@@ -26,12 +26,13 @@ def load_random_to_gpu():
     torch.rand(469, 387).cuda()
 
 
-def test_tensor_loading(create_tensor_fn, warmup_cycle=False, repeat=10):
-    action_player = ActionPlayer()
+def test_tensor_loading(create_tensor_fn, warmup_cycle=False, repeat=10, action_player=None):
+    if action_player is None:
+        action_player = ActionPlayer()
     # warmup cycle
     action_name = create_tensor_fn.__name__
     if warmup_cycle:
-        for i in range(30):
+        for _ in range(30):
             torch.rand(256, 256, device=torch.device("cuda:0"))
         action_name = action_name + "_with_warmup"
     action_player.benchmark(action_name, create_tensor_fn, repeat)

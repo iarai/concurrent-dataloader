@@ -13,4 +13,4 @@ class ActionPlayer:
             self.stopwatch.record(action_name + "_" + str(i))
             action()
             self.stopwatch.record(action_name + "_" + str(i))
-        self.stopwatch.get_results(action_name, repeat)
+        self.stopwatch.get_results(action_name)
