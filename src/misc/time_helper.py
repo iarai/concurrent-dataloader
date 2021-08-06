@@ -1,5 +1,6 @@
 import time
 from collections import defaultdict
+
 import numpy as np
 
 PRECISION = 6
@@ -15,7 +16,7 @@ class TimeHelper:
     def reset(self):
         self.recordings.clear()
 
-    def get_results(self, name: str, repeat: int, summary_only=True):
+    def get_results(self, name: str, repeat: int):
         diffs = []
         action_counter = 0
         for i in self.recordings:

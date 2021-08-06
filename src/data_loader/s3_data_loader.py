@@ -1,13 +1,11 @@
 import json
-import re
 import random
+import re
+from io import BytesIO
 
 import boto3
 from PIL import Image
 from torch.utils.data.dataset import Dataset
-from io import BytesIO
-
-FILENAME = "file_index.json"
 
 
 class S3DataLoader(Dataset):
@@ -16,14 +14,10 @@ class S3DataLoader(Dataset):
         self.mode = "scratch/imagenet/" + mode
 
         self.bucket_name = bucket_name
-        self.s3_client = boto3.resource(
-            "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key
-        )
+        self.s3_client = boto3.resource("s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key)
 
     def index_all(self):
-        self.image_paths = list(
-            self.s3_client.Bucket(self.bucket_name).objects.filter(Prefix=self.mode)
-        )
+        self.image_paths = list(self.s3_client.Bucket(self.bucket_name).objects.filter(Prefix=self.mode))
 
     def save_index(self):
         str_paths = []
@@ -51,9 +45,7 @@ class S3DataLoader(Dataset):
 
     def __getitem__(self, index):
         b = BytesIO()
-        self.s3_client.Bucket(self.bucket_name).download_fileobj(
-            self.image_paths[index].key, b
-        )
+        self.s3_client.Bucket(self.bucket_name).download_fileobj(self.image_paths[index].key, b)
         image = Image.open(b)
         return image
 
