@@ -1,9 +1,8 @@
 #! /usr/bin/python3
 import argparse
-import logging 
 
-from benchmark.data_loader import benchmark_scratch_storage
 from benchmark.data_loader import benchmark_s3_storage
+from benchmark.data_loader import benchmark_scratch_storage
 from benchmark.image_loader import benchmark_tensor_loading
 from benchmark.image_loader import load_random_image_to_gpu
 from benchmark.image_loader import load_random_tensor_on_gpu
@@ -44,9 +43,9 @@ if __name__ == "__main__":
     elif args.action == "random_image":
         benchmark_tensor_loading(load_random_image_to_gpu, warmup_cycle=False, action_repeat=200)
         benchmark_tensor_loading(load_random_image_to_gpu, warmup_cycle=True, action_repeat=200)
+    elif args.action == "mp":
+        benchmark_tensor_loading(load_random_image_to_gpu, True, 200)
+        action_player = MPActionPlayer(num_workers=8, pool_size=4)
+        benchmark_tensor_loading(load_random_image_to_gpu, True, 200, action_player)
     else:
         parser.print_help()
-
-    # test_tensor_loading(load_image, True, 200)
-    # action_player = MPActionPlayer(num_workers=8, pool_size=4)
-    # test_tensor_loading(load_image, True, 200, action_player)

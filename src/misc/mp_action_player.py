@@ -3,7 +3,7 @@ from multiprocessing import Pool
 from multiprocessing import set_start_method
 from typing import Callable
 
-from misc.time_helper import TimeHelper
+from misc.action_player import ActionPlayer
 
 try:
     set_start_method("spawn")
@@ -11,14 +11,12 @@ except RuntimeError:
     pass
 
 
-class MPActionPlayer:
+class MPActionPlayer(ActionPlayer):
     def __init__(self, num_workers: int = 4, pool_size: int = 2) -> None:
-        self.stopwatch = TimeHelper()
+        super().__init__()
+        print("Initializing Multiprocessing ActionPlayer")
         self.num_workers = num_workers
         self.pool_size = pool_size
-
-    def reset(self) -> None:
-        self.stopwatch.reset()
 
     def run(self, action_name: str, action: Callable, repeat_action: int = 20):
         pool_id = random.randint(0, 1000)

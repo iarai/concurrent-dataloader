@@ -1,6 +1,6 @@
+import logging
 from typing import Callable
 from typing import Type
-import logging
 
 import torch
 from misc.action_player import ActionPlayer
@@ -31,16 +31,19 @@ def load_random_tensor_to_gpu() -> None:
 
 
 def benchmark_tensor_loading(
-    create_tensor_fn: Callable, warmup_cycle: bool = False, action_repeat: int = 10, action_player: Type[ActionPlayer] = None
+    create_tensor_fn: Callable,
+    warmup_cycle: bool = False,
+    action_repeat: int = 10,
+    action_player: Type[ActionPlayer] = None,
 ) -> None:
-   
+
     if action_player is None:
         action_player = ActionPlayer()
-   
+
     # warmup cycle
     logging.info(f"Benchmarking tensor loading, using warmup cycle {warmup_cycle}")
     action_name = create_tensor_fn.__name__
-   
+
     # before performing the benchmark, perform a warmup cycle, usually helping GPU to speed up later processing
     # to avoid (hidden/unknown) "one-time" startup costs
     if warmup_cycle:

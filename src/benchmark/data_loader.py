@@ -1,5 +1,5 @@
 import json
-import logging 
+import logging
 from typing import Type
 
 from data_loader.s3_data_loader import S3DataLoader
