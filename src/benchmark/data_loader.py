@@ -1,4 +1,5 @@
 import json
+import logging 
 from typing import Type
 
 from data_loader.s3_data_loader import S3DataLoader
@@ -30,12 +31,14 @@ def test_data_loader(data_loader_instance: Type[S3DataLoader], skip_indexing: bo
     action_player.benchmark("load_index", data_loader_instance.load_index, 50)
 
 
-def test_scratch(dataset: str = "val") -> None:
+def benchmark_scratch_storage(dataset: str = "val") -> None:
+    logging.info("Starting benchmark ... Using scratch")
     # test dataloader with scratch
     test_data_loader(ScratchDataLoader(IMAGENET_PATH_SCRATCH, dataset))
 
 
-def test_s3(dataset: str = "val") -> None:
+def benchmark_s3_storage(dataset: str = "val") -> None:
+    logging.info("Starting benchmark ... Using S3")
     # read s3 credentials
     keys = get_s3_cred()
     # test dataloader with scratch

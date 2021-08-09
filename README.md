@@ -4,7 +4,7 @@ Work in progress...
 
 Use as:
 
-`python3 main.py -b s3`
+`python3 main.py -a s3`
 
 or to see help:
 
