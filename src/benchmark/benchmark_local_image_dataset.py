@@ -3,7 +3,7 @@ from typing import Callable
 from typing import Type
 
 import torch
-from misc.action_player import ActionPlayer
+from action_player.action_player import ActionPlayer
 from PIL import Image
 from torchvision import transforms
 

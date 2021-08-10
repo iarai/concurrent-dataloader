@@ -5,15 +5,18 @@ from pathlib import Path
 
 from PIL import Image
 from torch.utils.data.dataset import Dataset
+from torchvision import transforms
 
 IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 
 
-class ScratchDataLoader(Dataset):
+class ScratchDataset(Dataset):
     def __init__(self, imagenet_path: str, mode: str) -> None:
         self.mode = mode
         self.image_paths = []
         assert mode in ["train", "val"], mode
+        self.transform =  transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
+
         self.__imagenet_path = Path(os.path.join(imagenet_path, mode))
 
     def index_all(self) -> None:
@@ -35,13 +38,12 @@ class ScratchDataLoader(Dataset):
 
     def get_random_item(self) -> Image:
         rn = random.randint(0, self.__len__() - 1)
-        image = self.__getitem__(rn)
-        return image
+        return self.__getitem__(rn)
 
     def __getitem__(self, index) -> Image:
         image_path = self.image_paths[index]
         image = Image.open(image_path)
-        return image
+        return self.transform(image)
 
     def __len__(self) -> int:
         return len(self.image_paths)

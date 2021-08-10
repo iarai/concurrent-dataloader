@@ -1,10 +1,11 @@
 from typing import Callable
-
+import logging
 from misc.time_helper import TimeHelper
 
 
 class ActionPlayer:
     def __init__(self) -> None:
+        logging.debug("Initializing ActionPlayer")
         self.stopwatch = TimeHelper()
 
     def reset(self) -> None:

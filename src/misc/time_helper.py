@@ -27,13 +27,13 @@ class TimeHelper:
                 diff = self.recordings[i][1] - self.recordings[i][0]
                 diffs.append(diff)
                 action_counter = action_counter + 1
-        mean_indexing_time = np.round(np.mean(np.array(diffs)), PRECISION)
-        total = np.round(action_counter / mean_indexing_time, PRECISION)
+        mean_execution_time = np.round(np.mean(np.array(diffs)), PRECISION)
+        total = np.round(action_counter / mean_execution_time, PRECISION)
         if verbose:
             print(
-                f"Action (repeated {action_counter:10}): {name:15} "
-                f"Mean action time: {mean_indexing_time:10}, "
-                f"Total: {total:10} files/s "
-                f"min,max = ({max(diffs), min(diffs)})"
+                f"Action '{name}' (repeated {action_counter} times): "
+                f"Mean exec-time: {mean_execution_time}, "
+                f"Per action (i.e. file): {total} files/s "
+                f"Min: {min(diffs)}, Max: {max(diffs)})"
             )
-        return {"total": total, "mean": mean_indexing_time, "min": min(diffs), "max": max(diffs)}
+        return {"total": total, "mean": mean_execution_time, "min": min(diffs), "max": max(diffs)}

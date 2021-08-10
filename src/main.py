@@ -1,13 +1,14 @@
 #! /usr/bin/python3
 import argparse
 
-from benchmark.data_loader import benchmark_s3_storage
-from benchmark.data_loader import benchmark_scratch_storage
-from benchmark.image_loader import benchmark_tensor_loading
-from benchmark.image_loader import load_random_image_to_gpu
-from benchmark.image_loader import load_random_tensor_on_gpu
-from benchmark.image_loader import load_random_tensor_to_gpu
-from misc.mp_action_player import MPActionPlayer
+from action_player.mp_action_player import MPActionPlayer
+from benchmark.benchmark_dataloader import benchmark_scratch_dataloader
+from benchmark.benchmark_dataset import benchmark_s3_storage
+from benchmark.benchmark_dataset import benchmark_scratch_storage
+from benchmark.benchmark_local_image_dataset import benchmark_tensor_loading
+from benchmark.benchmark_local_image_dataset import load_random_image_to_gpu
+from benchmark.benchmark_local_image_dataset import load_random_tensor_on_gpu
+from benchmark.benchmark_local_image_dataset import load_random_tensor_to_gpu
 
 
 def handle_arguments() -> argparse.ArgumentParser:
@@ -47,5 +48,9 @@ if __name__ == "__main__":
         benchmark_tensor_loading(load_random_image_to_gpu, True, 200)
         action_player = MPActionPlayer(num_workers=8, pool_size=4)
         benchmark_tensor_loading(load_random_image_to_gpu, True, 200, action_player)
+        benchmark_tensor_loading(load_random_tensor_to_gpu, True, 200, action_player)
+        benchmark_tensor_loading(load_random_tensor_on_gpu, True, 200, action_player)
+    elif args.action == "wip":
+        benchmark_scratch_dataloader()
     else:
         parser.print_help()

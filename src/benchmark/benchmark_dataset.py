@@ -2,15 +2,15 @@ import json
 import logging
 from typing import Type
 
-from data_loader.s3_data_loader import S3DataLoader
-from data_loader.scratch_data_loader import ScratchDataLoader
-from misc.action_player import ActionPlayer
+from dataset.s3_dataset import S3Dataset
+from dataset.scratch_dataset import ScratchDataset
+from action_player.action_player import ActionPlayer
 
 IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 
 
 # main function that defines the testing order ... e.g. index, load, save
-def test_data_loader(data_loader_instance: Type[S3DataLoader], skip_indexing: bool = False) -> None:
+def benchmark_data_loader(data_loader_instance: Type[S3Dataset], skip_indexing: bool = False) -> None:
     action_player = ActionPlayer()
 
     # ls (index) all images
@@ -34,7 +34,7 @@ def test_data_loader(data_loader_instance: Type[S3DataLoader], skip_indexing: bo
 def benchmark_scratch_storage(dataset: str = "val") -> None:
     logging.info("Starting benchmark ... Using scratch")
     # test dataloader with scratch
-    test_data_loader(ScratchDataLoader(IMAGENET_PATH_SCRATCH, dataset))
+    benchmark_data_loader(ScratchDataset(IMAGENET_PATH_SCRATCH, dataset))
 
 
 def benchmark_s3_storage(dataset: str = "val") -> None:
@@ -42,8 +42,8 @@ def benchmark_s3_storage(dataset: str = "val") -> None:
     # read s3 credentials
     keys = get_s3_cred()
     # test dataloader with scratch
-    test_data_loader(
-        S3DataLoader(
+    benchmark_data_loader(
+        S3Dataset(
             mode=dataset, bucket_name="iarai-playground", access_key=keys["access_key"], secret_key=keys["secret"],
         ),
         skip_indexing=False,
