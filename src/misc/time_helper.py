@@ -1,3 +1,4 @@
+import statistics
 import time
 from collections import defaultdict
 from typing import Any
@@ -34,6 +35,7 @@ class TimeHelper:
                 f"Action '{name}' (repeated {action_counter} times): "
                 f"Mean exec-time: {mean_execution_time}, "
                 f"Per action (i.e. file): {total} files/s "
-                f"Min: {min(diffs)}, Max: {max(diffs)})"
+                f"Min: {min(diffs)}, Max: {max(diffs)}) "
+                f"std.dv: {statistics.stdev(diffs)}) "
             )
         return {"total": total, "mean": mean_execution_time, "min": min(diffs), "max": max(diffs)}

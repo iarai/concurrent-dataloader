@@ -1,5 +1,6 @@
-from typing import Callable
 import logging
+from typing import Callable
+
 from misc.time_helper import TimeHelper
 
 

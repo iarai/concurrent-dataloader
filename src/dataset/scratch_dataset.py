@@ -1,8 +1,9 @@
 import json
 import os
-import random
 from pathlib import Path
+from random import Random
 
+from misc.random_generator import RandomGenerator
 from PIL import Image
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
@@ -15,8 +16,8 @@ class ScratchDataset(Dataset):
         self.mode = mode
         self.image_paths = []
         assert mode in ["train", "val"], mode
-        self.transform =  transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
-
+        self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
+        self.rng = RandomGenerator()
         self.__imagenet_path = Path(os.path.join(imagenet_path, mode))
 
     def index_all(self) -> None:
@@ -37,7 +38,7 @@ class ScratchDataset(Dataset):
         [self.image_paths.append(Path(i)) for i in __str_paths]
 
     def get_random_item(self) -> Image:
-        rn = random.randint(0, self.__len__() - 1)
+        rn = self.rng.get_int(0, self.__len__() - 1)
         return self.__getitem__(rn)
 
     def __getitem__(self, index) -> Image:

@@ -2,9 +2,9 @@ import json
 import logging
 from typing import Type
 
+from action_player.action_player import ActionPlayer
 from dataset.s3_dataset import S3Dataset
 from dataset.scratch_dataset import ScratchDataset
-from action_player.action_player import ActionPlayer
 
 IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 

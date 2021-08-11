@@ -1,42 +1,80 @@
-from torch.utils.data import DataLoader
+import torch
+from action_player.action_player import ActionPlayer
 from data_loader.async_data_loader import AsynchronousLoader
 from dataset.scratch_dataset import ScratchDataset
-import torch
+from torch.utils.data import DataLoader
 
 IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 
-def get_scratch_dataloader():
-    sd = ScratchDataset(IMAGENET_PATH_SCRATCH, "val")
-    sd.index_all()
-    __scratch_dataloader = DataLoader(dataset=sd,
-    batch_size=2,
-    num_workers=4,
-    shuffle=False,
-    collate_fn=my_collate_fn)
-    return __scratch_dataloader
 
-def get_scratch_async_dataloader():
-    sd = ScratchDataset(IMAGENET_PATH_SCRATCH, "val")
-    sd.index_all()
-    __scratch_dataloader = AsynchronousLoader(data=sd,
-    batch_size=2,
-    num_workers=2,
-    shuffle=False,
-    device=torch.device("cuda"),
-    collate_fn=my_collate_fn)
-    return __scratch_dataloader
+dataset = ScratchDataset(IMAGENET_PATH_SCRATCH, "val")
+        # dataset.index_all()
+        # dataset.save_index()
+dataset.load_index()
+batch_size = 10
+num_workers = 4
 
-def my_collate_fn(batch):
+
+def set_dataloader(self, dataloader: str = "async"):
+    if dataloader == "async":
+        use_async_dataloader()
+    else:
+        use_torch_dataloader()
+
+def use_torch_dataloader():
+    return DataLoader(
+        dataset=dataset, 
+        batch_size=batch_size, 
+        num_workers=num_workers, 
+        shuffle=False, 
+        collate_fn=collate
+    )
+
+def use_async_dataloader():
+    return AsynchronousLoader(
+        data=dataset,
+        batch_size=batch_size,
+        num_workers=num_workers,
+        shuffle=False,
+        device=torch.device("cuda"),
+        collate_fn=collate,
+    )
+
+def collate(batch):
     imgs = [item for item in batch]
     return imgs
 
+default_dataloader = use_async_dataloader()
+
+
+def load_single():
+    try:
+        n = next(iter(default_dataloader))
+        print(len(n), len(n[0]))
+    except StopIteration:
+        pass
+
+def load_all():
+    # get single
+    try:
+        for i, batch in enumerate(default_dataloader):
+            if i % 1000 == 0:
+                print(f"{len(batch)}, {i}")
+        # print(len(n), len(n[0]))
+    except StopIteration:
+        pass
+
+
 def benchmark_scratch_dataloader():
-    r = next(iter(get_scratch_dataloader()))   
-    print(f"Return from torch dataloader: {type(r)}")
-    for l in r:
-        print(f"{type(l)}")
-    
-    r = next(iter(get_scratch_async_dataloader()))   
-    print(f"Return from async_dataloader: {type(r)}")
-    for l in r:
-        print(f"{type(l)}")
+    action_player = ActionPlayer()
+    #bm = BechmarkDataloader(10, 4)
+    # todo calculate runtime for batches, and images per batch, try out different sizes of batchers and workers...
+    # todo https://discuss.pytorch.org/t/torch-cuda-streams-stream-in-multiprocess-context-causes-error-cant-pickle-stream-objects/80625
+    # todo, for some reason, this donesn't work as a class (the reason above)
+
+    # action_player.benchmark("loading_with_dataloader", bm.load_single, 2)
+    # action_player.benchmark("loading_with_dataloader", bm.load_all, 2)
+
+
+    action_player.benchmark("loading_with_dataloader", load_single, 2)
+    print("Done...")

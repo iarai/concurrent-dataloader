@@ -1,9 +1,9 @@
 import json
-import random
 import re
 from io import BytesIO
 
 import boto3
+from misc.random_generator import RandomGenerator
 from PIL import Image
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
@@ -13,9 +13,10 @@ class S3Dataset(Dataset):
     def __init__(self, mode: str, bucket_name: str, access_key: str, secret_key: str) -> None:
         self.image_paths = []
         self.mode = "scratch/imagenet/" + mode
-        self.transform =  transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
+        self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
         self.bucket_name = bucket_name
         self.s3_client = boto3.resource("s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key)
+        self.rng = RandomGenerator()
 
     def index_all(self) -> None:
         self.image_paths = list(self.s3_client.Bucket(self.bucket_name).objects.filter(Prefix=self.mode))
@@ -40,7 +41,7 @@ class S3Dataset(Dataset):
             self.image_paths.append(self.s3_client.ObjectSummary(i[0][1], i[1][1]))
 
     def get_random_item(self) -> Image:
-        rn = random.randint(0, self.__len__())
+        rn = self.rng.get_int(0, self.__len__())
         return self.__getitem__(rn)
 
     def __getitem__(self, index: int) -> Image:
