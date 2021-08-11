@@ -71,7 +71,7 @@ def benchmark_scratch_dataloader():
     # todo calculate runtime for batches, and images per batch, try out different sizes of batchers and workers...
     # todo https://discuss.pytorch.org/t/torch-cuda-streams-stream-in-multiprocess-context-causes-error-cant-pickle-stream-objects/80625
     # todo, for some reason, this donesn't work as a class (the reason above)
-
+    
     # action_player.benchmark("loading_with_dataloader", bm.load_single, 2)
     # action_player.benchmark("loading_with_dataloader", bm.load_all, 2)
 
