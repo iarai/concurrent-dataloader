@@ -61,13 +61,13 @@ def load_all():
             if i % 1000 == 0:
                 print(f"{len(batch)}, {i}")
         # print(len(n), len(n[0]))
-    except StopIteration:
-        pass
-
+    except (StopIteration, EOFError) as e:
+        print(f"Exception raised: {str(e)}")
 
 def benchmark_scratch_dataloader():
     action_player = ActionPlayer()
     #bm = BechmarkDataloader(10, 4)
+
     # todo calculate runtime for batches, and images per batch, try out different sizes of batchers and workers...
     # todo https://discuss.pytorch.org/t/torch-cuda-streams-stream-in-multiprocess-context-causes-error-cant-pickle-stream-objects/80625
     # todo, for some reason, this donesn't work as a class (the reason above)
@@ -75,6 +75,7 @@ def benchmark_scratch_dataloader():
     # action_player.benchmark("loading_with_dataloader", bm.load_single, 2)
     # action_player.benchmark("loading_with_dataloader", bm.load_all, 2)
 
-
-    action_player.benchmark("loading_with_dataloader", load_single, 2)
+    print("Dataloader benchmark")
+    # action_player.benchmark("loading_with_dataloader", load_single, 2)
+    action_player.benchmark("loading_with_dataloader", load_all, 2)
     print("Done...")
