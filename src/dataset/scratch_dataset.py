@@ -1,7 +1,6 @@
 import json
 import os
 from pathlib import Path
-from random import Random
 
 from misc.random_generator import RandomGenerator
 from PIL import Image
@@ -12,8 +11,9 @@ IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 
 
 class ScratchDataset(Dataset):
-    def __init__(self, imagenet_path: str, mode: str) -> None:
+    def __init__(self, imagenet_path: str, mode: str, limit: int) -> None:
         self.mode = mode
+        self.limit = limit
         self.image_paths = []
         assert mode in ["train", "val"], mode
         self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
@@ -47,4 +47,7 @@ class ScratchDataset(Dataset):
         return self.transform(image)
 
     def __len__(self) -> int:
-        return len(self.image_paths)
+        if self.limit is None:
+            return len(self.image_paths)
+        else:
+            return len(self.image_paths[: self.limit])

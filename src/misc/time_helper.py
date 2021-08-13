@@ -1,6 +1,7 @@
 import statistics
 import time
 from collections import defaultdict
+from functools import wraps
 from typing import Any
 from typing import Dict
 from typing import Union
@@ -31,11 +32,30 @@ class TimeHelper:
         mean_execution_time = np.round(np.mean(np.array(diffs)), PRECISION)
         total = np.round(action_counter / mean_execution_time, PRECISION)
         if verbose:
+            stdev = 0
+            if len(diffs) > 1:
+                stdev = statistics.stdev(diffs)
             print(
                 f"Action '{name}' (repeated {action_counter} times): "
                 f"Mean exec-time: {mean_execution_time}, "
                 f"Per action (i.e. file): {total} files/s "
                 f"Min: {min(diffs)}, Max: {max(diffs)}) "
-                f"std.dv: {statistics.stdev(diffs)}) "
+                f"std.dv: {stdev}) "
             )
         return {"total": total, "mean": mean_execution_time, "min": min(diffs), "max": max(diffs)}
+
+
+def stopwatch(method):
+    @wraps(method)
+    def time_profile(*args, **kw):
+        ts = time.time()
+        result = method(*args, **kw)
+        te = time.time()
+        if "log_time" in kw:
+            name = kw.get("log_name", method.__name__.upper())
+            kw["log_time"][name] = int((te - ts) * 1000)
+        else:
+            print(f"EXEC TIME: {method.__name__} ({id(method)}) ... {(te - ts) * 1000}ms")
+        return result
+
+    return time_profile

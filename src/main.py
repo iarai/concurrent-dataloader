@@ -61,7 +61,7 @@ if __name__ == "__main__":
     elif args.action == "wip":
         benchmark_scratch_dataloader()
 
-        # t = load_local_image_to_gpu()
-        # t = load_random_local_image_to_gpu()
+        # t = load_local_image_to_gpu() # flake8: noqa
+        # t = load_random_local_image_to_gpu() # flake8: noqa
     else:
         parser.print_help()

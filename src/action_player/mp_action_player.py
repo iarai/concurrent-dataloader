@@ -36,4 +36,4 @@ class MPActionPlayer(ActionPlayer):
             results = pool.starmap(self.run, [(action_name, action, repeat // self.num_workers)] * self.num_workers)
         logging.info(f"Results (time per paralel process): {results}, sum = {sum(results)}")
         # full action details
-        # logging.debug()
+        # logging.debug() # flake8: noqa
