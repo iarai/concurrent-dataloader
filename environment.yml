@@ -1,0 +1,16 @@
+name: storage-benchmarking
+channels:
+  - defaults
+  - pytorch
+dependencies:
+  - python=3.9.2
+  - pytorch=1.9.0
+  - pip:
+    - numpy==1.21.1
+    - pillow==8.3.1
+    - torchaudio==0.9.0
+    - torchtext==0.10.0
+    - torchvision==0.10.0
+    - tqdm==4.61.2
+    - boto3==1.18.18
+    - pre-commit==2.13.0
