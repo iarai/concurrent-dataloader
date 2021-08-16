@@ -3,16 +3,19 @@ r""""Contains definitions of the methods used by the _BaseDataLoaderIter workers
 These **needs** to be in global scope since Py2 doesn't support serializing
 static methods.
 """
-
-import torch
-import random
 import os
 import queue
+import random
 from dataclasses import dataclass
-from torch._utils import ExceptionWrapper
 from typing import Union
-from torch.utils.data._utils import signal_handling, MP_STATUS_CHECK_INTERVAL, IS_WINDOWS, HAS_NUMPY
+
+import torch
 from misc.time_helper import stopwatch
+from torch._utils import ExceptionWrapper
+from torch.utils.data._utils import HAS_NUMPY
+from torch.utils.data._utils import IS_WINDOWS
+from torch.utils.data._utils import MP_STATUS_CHECK_INTERVAL
+from torch.utils.data._utils import signal_handling
 
 if IS_WINDOWS:
     import ctypes
@@ -26,7 +29,7 @@ if IS_WINDOWS:
             self.manager_pid = os.getppid()
 
             # mypy cannot detect this code is windows only
-            self.kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)  # type: ignore[attr-defined]
+            self.kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
             self.kernel32.OpenProcess.argtypes = (DWORD, BOOL, DWORD)
             self.kernel32.OpenProcess.restype = HANDLE
             self.kernel32.WaitForSingleObject.argtypes = (HANDLE, DWORD)
@@ -46,7 +49,10 @@ if IS_WINDOWS:
                 # Value obtained from https://msdn.microsoft.com/en-us/library/windows/desktop/ms687032.aspx
                 self.manager_dead = self.kernel32.WaitForSingleObject(self.manager_handle, 0) == 0
             return not self.manager_dead
+
+
 else:
+
     class ManagerWatchdog(object):  # type: ignore[no-redef]
         def __init__(self):
             self.manager_pid = os.getppid()
@@ -56,6 +62,7 @@ else:
             if not self.manager_dead:
                 self.manager_dead = os.getppid() != self.manager_pid
             return not self.manager_dead
+
 
 _worker_info = None
 
@@ -77,8 +84,8 @@ class WorkerInfo(object):
     def __repr__(self):
         items = []
         for k in self.__keys:
-            items.append('{}={}'.format(k, getattr(self, k)))
-        return '{}({})'.format(self.__class__.__name__, ', '.join(items))
+            items.append("{}={}".format(k, getattr(self, k)))
+        return "{}({})".format(self.__class__.__name__, ", ".join(items))
 
 
 def get_worker_info():
@@ -111,14 +118,20 @@ def get_worker_info():
 
 
 r"""Dummy class used to signal the end of an IterableDataset"""
+
+
 @dataclass(frozen=True)
 class _IterableDatasetStopIteration(object):
     worker_id: int
 
+
 r"""Dummy class used to resume the fetching when worker reuse is enabled"""
+
+
 @dataclass(frozen=True)
 class _ResumeIteration(object):
     pass
+
 
 # The function `_generate_state` is adapted from `numpy.random.SeedSequence`
 # from https://github.com/numpy/numpy/blob/main/numpy/random/bit_generator.pyx
@@ -150,12 +163,12 @@ class _ResumeIteration(object):
 # seed and algorithm for `numpy.random` and `random` modules.
 # TODO: Implement `SeedSequence` like object for `torch.random`
 def _generate_state(base_seed, worker_id):
-    INIT_A = 0x43b0d7e5
-    MULT_A = 0x931e8875
-    INIT_B = 0x8b51f9dd
-    MULT_B = 0x58f38ded
-    MIX_MULT_L = 0xca01f9dd
-    MIX_MULT_R = 0x4973f715
+    INIT_A = 0x43B0D7E5
+    MULT_A = 0x931E8875
+    INIT_B = 0x8B51F9DD
+    MULT_B = 0x58F38DED
+    MIX_MULT_L = 0xCA01F9DD
+    MIX_MULT_R = 0x4973F715
     XSHIFT = 4 * 8 // 2
     MASK32 = 0xFFFFFFFF
 
@@ -200,10 +213,22 @@ def _generate_state(base_seed, worker_id):
         state.append(data_val)
     return state
 
-@stopwatch
-def _worker_loop(dataset_kind, dataset, index_queue, data_queue, done_event,
-                 auto_collation, collate_fn, drop_last, base_seed, init_fn, worker_id,
-                 num_workers, persistent_workers):
+@stopwatch("(3)-worker_loop")
+def _worker_loop(
+    dataset_kind,
+    dataset,
+    index_queue,
+    data_queue,
+    done_event,
+    auto_collation,
+    collate_fn,
+    drop_last,
+    base_seed,
+    init_fn,
+    worker_id,
+    num_workers,
+    persistent_workers,
+):
     # See NOTE [ Data Loader Multiprocessing Shutdown Logic ] for details on the
     # logic of this function.
     try:
@@ -221,11 +246,11 @@ def _worker_loop(dataset_kind, dataset, index_queue, data_queue, done_event,
         if HAS_NUMPY:
             np_seed = _generate_state(base_seed, worker_id)
             import numpy as np
+
             np.random.seed(np_seed)
 
         global _worker_info
-        _worker_info = WorkerInfo(id=worker_id, num_workers=num_workers,
-                                  seed=seed, dataset=dataset)
+        _worker_info = WorkerInfo(id=worker_id, num_workers=num_workers, seed=seed, dataset=dataset)
 
         from torch_overrides.dataloader import _DatasetKind
 
@@ -237,8 +262,7 @@ def _worker_loop(dataset_kind, dataset, index_queue, data_queue, done_event,
 
             fetcher = _DatasetKind.create_fetcher(dataset_kind, dataset, auto_collation, collate_fn, drop_last)
         except Exception:
-            init_exception = ExceptionWrapper(
-                where="in DataLoader worker process {}".format(worker_id))
+            init_exception = ExceptionWrapper(where="in DataLoader worker process {}".format(worker_id))
 
         # When using Iterable mode, some worker can exit earlier than others due
         # to the IterableDataset behaving differently for different workers.
@@ -266,8 +290,7 @@ def _worker_loop(dataset_kind, dataset, index_queue, data_queue, done_event,
                 data_queue.put((r, None))
                 iteration_end = False
                 # Recreate the fetcher for worker-reuse policy
-                fetcher = _DatasetKind.create_fetcher(
-                    dataset_kind, dataset, auto_collation, collate_fn, drop_last)
+                fetcher = _DatasetKind.create_fetcher(dataset_kind, dataset, auto_collation, collate_fn, drop_last)
                 continue
             elif r is None:
                 # Received the final signal
@@ -297,9 +320,8 @@ def _worker_loop(dataset_kind, dataset, index_queue, data_queue, done_event,
                         # It is important that we don't store exc_info in a variable.
                         # `ExceptionWrapper` does the correct thing.
                         # See NOTE [ Python Traceback Reference Cycle Problem ]
-                        data = ExceptionWrapper(
-                            where="in DataLoader worker process {}".format(worker_id))
-            #print(f"Worker data: {worker_id} fetching {index}, {idx}")
+                        data = ExceptionWrapper(where="in DataLoader worker process {}".format(worker_id))
+            # print(f"Worker data: {worker_id} fetching {index}, {idx}")
             data_queue.put((idx, data))
             del data, idx, index, r  # save memory
     except KeyboardInterrupt:

@@ -1,3 +1,7 @@
-from torch_overrides.dataloader import DataLoader
+import torch_overrides.dataloader
+import torch_overrides.fetch
+import torch_overrides.worker
 
-DataLoader._try_get_data.fs
+torch_overrides.dataloader
+torch_overrides.worker
+torch_overrides.fetch

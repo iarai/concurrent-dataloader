@@ -1,4 +1,3 @@
-#! /usr/bin/python3
 import argparse
 import logging
 
@@ -59,6 +58,8 @@ if __name__ == "__main__":
         benchmark_tensor_loading(load_random_tensor_to_gpu, True, 200, action_player)
         benchmark_tensor_loading(load_random_tensor_on_gpu, True, 200, action_player)
     elif args.action == "wip":
+        benchmark_scratch_dataloader()
+        
         benchmark_scratch_dataloader()
 
         # t = load_local_image_to_gpu() # flake8: noqa

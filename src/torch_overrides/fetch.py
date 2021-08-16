@@ -2,7 +2,12 @@ r""""Contains definitions of the methods used by the _BaseDataLoaderIter to fetc
 data from an iterable-style or map-style dataset. This logic is shared in both
 single- and multi-processing data loading.
 """
+
+import concurrent.futures
+import functools
+import asyncio
 from misc.time_helper import stopwatch
+
 
 class _BaseDatasetFetcher(object):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):
@@ -39,7 +44,7 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):
         super(_MapDatasetFetcher, self).__init__(dataset, auto_collation, collate_fn, drop_last)
 
-    @stopwatch
+    @stopwatch("(4)-mapdataset-fetcher")
     def fetch(self, possibly_batched_index):
         # print("Overriden... {possibly_batched_index}")
         if self.auto_collation:
@@ -47,10 +52,6 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
         else:
             data = self.dataset[possibly_batched_index]
         return self.collate_fn(data)
-
-import concurrent.futures
-import functools
-import asyncio
 
 class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):
@@ -62,16 +63,16 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
             f_bound = functools.partial(f, **kwargs)
             loop = asyncio.get_running_loop()
             return await loop.run_in_executor(self.executor, f_bound)
+
         return aio_wrapper
 
     def _fetch(self, possibly_batched_index):
-        # print(f"Fetching  (MT) ... {possibly_batched_index}")
         if self.auto_collation:
             data = [self.dataset[idx] for idx in possibly_batched_index]
         else:
             data = self.dataset[possibly_batched_index]
         return self.collate_fn(data)
 
-    @stopwatch
+    @stopwatch("(4)-threadedmapdataset-fetcher")
     def fetch(self, possibly_batched_index):
         self.async_exec(self._fetch(possibly_batched_index))

@@ -44,19 +44,21 @@ class BechmarkDataloader:
                 shuffle=False,
                 device=torch.device("cuda"),
                 collate_fn=self.collate,
-                # prefetch_factor=2, 
+                # prefetch_factor=2,
             )
 
     def collate(self, batch: List) -> Tensor:
         imgs = [item for item in batch]
         return imgs
 
+    @stopwatch("(2)-load_single")
     def load_single(self, dataloader: DataLoader) -> None:
         try:
             _ = next(iter(dataloader))
         except (StopIteration, EOFError) as e:
             print(f"Exception raised: {str(e)}")
 
+    @stopwatch("(2)-load_all")
     def load_all(self, dataloader: DataLoader) -> None:
         try:
             for i, batch in enumerate(dataloader):
@@ -68,18 +70,18 @@ class BechmarkDataloader:
             print(f"Exception raised: {str(e)}")
 
 
-@stopwatch
+@stopwatch("(1)-benchmark")
 def benchmark_scratch_dataloader():
     action_player = ActionPlayer()
 
     bm = BechmarkDataloader(batch_size=4, num_workers=2)
-    # dl = bm.create_dataloader("async")
-    dl = bm.create_dataloader("torch")
+    dl = bm.create_dataloader("async")
+    # dl = bm.create_dataloader("torch")
 
     # override the _worker_loop to inject @stopwatch
     torch.utils.data._utils.worker._worker_loop = _worker_loop
 
     print("Dataloader benchmark")
-    action_player.benchmark("loading_with_dataloader", lambda: bm.load_single(dl), 1)
+    # action_player.benchmark("loading_with_dataloader", lambda: bm.load_single(dl), 1)
     action_player.benchmark("loading_with_dataloader", lambda: bm.load_all(dl), 1)
     print("Done...")

@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 
 from misc.random_generator import RandomGenerator
+from misc.time_helper import stopwatch
 from PIL import Image
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
@@ -41,6 +42,7 @@ class ScratchDataset(Dataset):
         rn = self.rng.get_int(0, self.__len__() - 1)
         return self.__getitem__(rn)
 
+    @stopwatch("(5)-get_item")
     def __getitem__(self, index) -> Image:
         image_path = self.image_paths[index]
         image = Image.open(image_path)
