@@ -5,6 +5,7 @@ from functools import wraps
 from typing import Any
 from typing import Dict
 from typing import Union
+import logging 
 
 import numpy as np
 
@@ -43,7 +44,6 @@ class TimeHelper:
                 f"std.dv: {stdev}) "
             )
         return {"total": total, "mean": mean_execution_time, "min": min(diffs), "max": max(diffs)}
-
 
 def stopwatch(trace_name):
     def time_profiler(method):

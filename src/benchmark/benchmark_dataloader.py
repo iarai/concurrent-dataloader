@@ -13,14 +13,17 @@ IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 
 
 class BechmarkDataloader:
-    def __init__(self, batch_size: int = 1, num_workers: int = 1, dataset: str = "val") -> None:
+    def __init__(self, batch_size: int = 1, num_workers: int = 1, dataset: str = "val", limit: bool = True) -> None:
         self.batch_size = batch_size
         self.num_workers = num_workers
-        limit = batch_size * num_workers * 10
+        if limit:
+            self.limit = batch_size * num_workers * 10
+        else:
+            self.limit = None
         print(f"Data size: {limit}")
 
         # todo extend to S3
-        self.dataset = ScratchDataset(IMAGENET_PATH_SCRATCH, "val", limit=limit)
+        self.dataset = ScratchDataset(IMAGENET_PATH_SCRATCH, "val", limit=self.limit)
         self.dataset.load_index()
 
         # note: dataloader cannot be the part of this class due to pickling error
@@ -71,17 +74,18 @@ class BechmarkDataloader:
 
 
 @stopwatch("(1)-benchmark")
-def benchmark_scratch_dataloader():
+def benchmark_scratch_dataloader(args):
     action_player = ActionPlayer()
 
-    bm = BechmarkDataloader(batch_size=4, num_workers=2)
-    dl = bm.create_dataloader("async")
-    # dl = bm.create_dataloader("torch")
+    bm = BechmarkDataloader(batch_size=int(args[0]), num_workers=int(args[1]), limit=False)
+    if args[2] == "async":
+        dl = bm.create_dataloader("async")
+    else:
+        dl = bm.create_dataloader("torch")
 
     # override the _worker_loop to inject @stopwatch
     torch.utils.data._utils.worker._worker_loop = _worker_loop
-
-    print("Dataloader benchmark")
-    # action_player.benchmark("loading_with_dataloader", lambda: bm.load_single(dl), 1)
-    action_player.benchmark("loading_with_dataloader", lambda: bm.load_all(dl), 1)
-    print("Done...")
+    print(f"Warmup ... batch {args[0]}, workers {args[1]}")
+    action_player.benchmark("loading_with_dataloader", lambda: bm.load_single(dl), 10, True)
+    print("Warmup -- end")
+    action_player.benchmark("loading_with_dataloader", lambda: bm.load_all(dl), 5, True)
