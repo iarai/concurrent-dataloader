@@ -39,7 +39,7 @@ if __name__ == "__main__":
     dataset = args.dataset
 
     if args.action == "s3":
-        benchmark_s3_storage(dataset)
+        benchmark_s3_storage(dataset, mp=True)
     elif args.action == "scratch":
         benchmark_scratch_storage(dataset)
     elif args.action == "random_gpu":

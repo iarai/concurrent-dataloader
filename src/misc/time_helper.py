@@ -36,6 +36,8 @@ class TimeHelper:
             stdev = 0
             if len(diffs) > 1:
                 stdev = statistics.stdev(diffs)
+            elif len(diff) == 0:
+                return {"total": total, "mean": mean_execution_time, "min": 0, "max": 0}
             print(
                 f"Action '{name}' (repeated {action_counter} times): "
                 f"Mean exec-time: {mean_execution_time}ms, "
