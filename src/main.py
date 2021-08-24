@@ -3,7 +3,7 @@ import logging
 import sys
 
 from action_player.mp_action_player import MPActionPlayer
-from benchmark.benchmark_dataloader import benchmark_scratch_dataloader
+from benchmark.benchmark_dataloader import benchmark_s3_dataloader
 from benchmark.benchmark_dataset import benchmark_s3_storage
 from benchmark.benchmark_dataset import benchmark_scratch_storage
 from benchmark.benchmark_local_image_dataset import benchmark_tensor_loading
@@ -60,7 +60,11 @@ if __name__ == "__main__":
         benchmark_tensor_loading(load_local_image_to_gpu, True, 200, action_player)
         benchmark_tensor_loading(load_random_tensor_to_gpu, True, 200, action_player)
         benchmark_tensor_loading(load_random_tensor_on_gpu, True, 200, action_player)
-    elif args.action == "wip":
-        benchmark_scratch_dataloader(args.args)
+    elif args.action == "dataloader":
+        batch_size = int(args.args[0])
+        num_workers = int(args.args[1])
+        data_loader_type = int(args.args[2])
+
+        benchmark_s3_dataloader(batch_size, num_workers, data_loader_type)
     else:
         parser.print_help()

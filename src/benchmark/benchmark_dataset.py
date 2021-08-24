@@ -19,38 +19,40 @@ def benchmark_data_loader(data_loader_instance: Type[S3Dataset], skip_indexing: 
     if not mp:
         action_player = ActionPlayer()
     else:
+        assert skip_indexing, "Indexing cannot be performed by Multi-Processing ActionPlayer"
         action_player = MPActionPlayer()
-    # indexing cannot be MP 
-    # writing index also 
 
-    # # ls (index) all images
-    # if not skip_indexing:
-    #     print("Indexing")
-    #     action_player.benchmark("indexing", data_loader_instance.index_all, 5)
-    # else:
-    #     print("Loading")
-    #     action_player.benchmark("load_index", data_loader_instance.load_index, 5)
-    #     action_player.benchmark("loading_random", data_loader_instance.get_random_item, 10000)
-    #     return
+    # ls (index) all images
+    if not skip_indexing:
+        print("Indexing")
+        action_player.benchmark("indexing", data_loader_instance.index_all, 5)
+    else:
+        print("Loading")
+        action_player.benchmark("load_index", data_loader_instance.load_index, 5)
+        action_player.benchmark("loading_random", data_loader_instance.get_random_item, 10000)
+        return
 
-    # # load random images
-    # action_player.benchmark("loading_random", data_loader_instance.get_random_item, 5)
+    # load random images
+    action_player.benchmark("loading_random", data_loader_instance.get_random_item, 5)
 
-    # # # save index to file
-    # action_player.benchmark("save_index", data_loader_instance.save_index, 5)
+    # # save index to file
+    action_player.benchmark("save_index", data_loader_instance.save_index, 5)
 
     # load index from file
     print("Loading index... ")
-    # data_loader_instance.load_index()
+    data_loader_instance.load_index()
+
     action_player.benchmark("load_index", data_loader_instance.load_index, 2)
     print(f"Loading index... Done. Len {data_loader_instance.__len__()}")
+
     data_loader_instance.get_random_item()
-    # action_player.benchmark("loading_random", data_loader_instance.get_random_item, 2)  
+    action_player.benchmark("loading_random", data_loader_instance.get_random_item, 2)
+
 
 def benchmark_scratch_storage(dataset: str = "val", mp: bool = False) -> None:
     logging.info("Starting benchmark ... Using scratch")
     # test dataloader with scratch
-    benchmark_data_loader(ScratchDataset(IMAGENET_PATH_SCRATCH, dataset), mp = mp)
+    benchmark_data_loader(ScratchDataset(IMAGENET_PATH_SCRATCH, dataset), mp=mp)
 
 
 def benchmark_s3_storage(dataset: str = "val", mp: bool = False) -> None:
