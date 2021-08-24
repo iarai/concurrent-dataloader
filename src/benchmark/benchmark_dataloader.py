@@ -38,7 +38,7 @@ def collate(batch: List) -> Tensor:
 
 
 @stopwatch("(1)-benchmark")
-def benchmark_s3_dataloader(batch_size, num_workers, data_loader_type):
+def benchmark_s3_dataloader(batch_size: int, num_workers:int , data_loader_type: str) -> None:
     action_player = ActionPlayer()
 
     _dataset = S3Dataset(mode="val", bucket_name="iarai-playground")

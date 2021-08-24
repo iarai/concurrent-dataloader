@@ -62,7 +62,7 @@ def benchmark_s3_storage(dataset: str = "val", mp: bool = False) -> None:
         S3Dataset(
             mode=dataset, bucket_name="iarai-playground",
         ),
-        skip_indexing=False,
+        skip_indexing=True,
         mp=mp,
     )
 

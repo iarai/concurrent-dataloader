@@ -11,8 +11,7 @@ from benchmark.benchmark_local_image_dataset import load_local_image_to_gpu
 from benchmark.benchmark_local_image_dataset import load_random_local_image_to_gpu
 from benchmark.benchmark_local_image_dataset import load_random_tensor_on_gpu
 from benchmark.benchmark_local_image_dataset import load_random_tensor_to_gpu
-
-# from misc.random_generator import RandomGenerator
+from misc.random_generator import RandomGenerator
 
 
 def handle_arguments() -> argparse.ArgumentParser:
@@ -30,6 +29,8 @@ def handle_arguments() -> argparse.ArgumentParser:
 
 if __name__ == "__main__":
     # logging.basicConfig(level=logging.DEBUG)
+    action_repeat = 5
+    verbose = True
 
     # interpret arguments
     parser = handle_arguments()
@@ -43,28 +44,29 @@ if __name__ == "__main__":
     elif args.action == "scratch":
         benchmark_scratch_storage(dataset)
     elif args.action == "random_gpu":
-        benchmark_tensor_loading(load_random_tensor_on_gpu, warmup_cycle=False, action_repeat=200)
-        benchmark_tensor_loading(load_random_tensor_on_gpu, warmup_cycle=True, action_repeat=200)
+        benchmark_tensor_loading(load_random_tensor_on_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose)
+        benchmark_tensor_loading(load_random_tensor_on_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose)
     elif args.action == "random_to_gpu":
-        benchmark_tensor_loading(load_random_tensor_to_gpu, warmup_cycle=False, action_repeat=200)
-        benchmark_tensor_loading(load_random_tensor_to_gpu, warmup_cycle=True, action_repeat=200)
+        benchmark_tensor_loading(load_random_tensor_to_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose)
+        benchmark_tensor_loading(load_random_tensor_to_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose)
     elif args.action == "single_image":
-        benchmark_tensor_loading(load_local_image_to_gpu, warmup_cycle=False, action_repeat=200)
-        benchmark_tensor_loading(load_local_image_to_gpu, warmup_cycle=True, action_repeat=200)
+        benchmark_tensor_loading(load_local_image_to_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose)
+        benchmark_tensor_loading(load_local_image_to_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose)
     elif args.action == "random_image":
-        benchmark_tensor_loading(load_random_local_image_to_gpu, warmup_cycle=False, action_repeat=200)
-        benchmark_tensor_loading(load_random_local_image_to_gpu, warmup_cycle=True, action_repeat=200)
+        benchmark_tensor_loading(load_random_local_image_to_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose)
+        benchmark_tensor_loading(load_random_local_image_to_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose)
     elif args.action == "mp":
-        benchmark_tensor_loading(load_local_image_to_gpu, True, 200)
-        action_player = MPActionPlayer(num_workers=8, pool_size=4)
-        benchmark_tensor_loading(load_local_image_to_gpu, True, 200, action_player)
-        benchmark_tensor_loading(load_random_tensor_to_gpu, True, 200, action_player)
-        benchmark_tensor_loading(load_random_tensor_on_gpu, True, 200, action_player)
+        pass
+        #benchmark_tensor_loading(load_local_image_to_gpu, True, action_repeat, verbose=verbose)
+        rng = RandomGenerator()
+        mpap = MPActionPlayer(rng, num_workers=8, pool_size=4)
+        benchmark_tensor_loading(load_local_image_to_gpu, True, action_repeat, mpap, verbose=verbose)
+        # benchmark_tensor_loading(load_random_tensor_to_gpu, True, action_repeat, action_player, verbose=verbose)
+        # benchmark_tensor_loading(load_random_tensor_on_gpu, True, action_repeat, action_player, verbose=verbose)
     elif args.action == "dataloader":
         batch_size = int(args.args[0])
         num_workers = int(args.args[1])
-        data_loader_type = int(args.args[2])
-
+        data_loader_type = args.args[2]
         benchmark_s3_dataloader(batch_size, num_workers, data_loader_type)
     else:
         parser.print_help()

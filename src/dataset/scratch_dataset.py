@@ -12,7 +12,7 @@ IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 
 
 class ScratchDataset(Dataset):
-    def __init__(self, imagenet_path: str, mode: str, limit: int) -> None:
+    def __init__(self, imagenet_path: str, mode: str, limit: int = None) -> None:
         self.mode = mode
         self.limit = limit
         self.image_paths = []

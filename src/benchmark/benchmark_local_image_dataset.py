@@ -55,6 +55,7 @@ def benchmark_tensor_loading(
     warmup_cycle: bool = False,
     action_repeat: int = 10,
     action_player: Type[ActionPlayer] = None,
+    verbose = False
 ) -> None:
 
     if action_player is None:
@@ -70,4 +71,4 @@ def benchmark_tensor_loading(
         for _ in range(30):
             torch.rand(256, 256, device=torch.device("cuda:0"))
         action_name = action_name + "_with_warmup"
-    action_player.benchmark(action_name, create_tensor_fn, action_repeat)
+    action_player.benchmark(action_name=action_name, action=create_tensor_fn, repeat=action_repeat, verbose=verbose)
