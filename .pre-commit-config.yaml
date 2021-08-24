@@ -46,6 +46,7 @@ repos:
             flake8-tabs, # Tab (or Spaces) indentation style checker for flake8
             pep8-naming, # Check PEP-8 naming conventions, plugin for flake8
         ]
+        exclude: ^src/torch_overrides/
   - repo: https://github.com/jendrikseipp/vulture
     rev: "v2.3"  # or any later Vulture version
     hooks:

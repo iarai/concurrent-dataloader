@@ -5,6 +5,7 @@ __pycache__/
 
 #s3 cred
 s3_credentials.json
+output/
 
 # C extensions
 *.so

@@ -1,9 +1,8 @@
 from typing import List
-import json
+
 import torch
 from action_player.action_player import ActionPlayer
 from data_loader.async_data_loader import AsynchronousLoader
-from dataset.scratch_dataset import ScratchDataset
 from dataset.s3_clean_dataset import S3Dataset
 from misc.time_helper import stopwatch
 from torch.functional import Tensor
@@ -12,25 +11,20 @@ from torch_overrides.worker import _worker_loop
 
 IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 
-_dataset = S3Dataset(
-                mode="val", 
-                bucket_name="iarai-playground", 
-                limit=80
-            )
-_dataset.load_index()
-
-def collate(self, batch: List) -> Tensor:
+def collate(batch: List) -> Tensor:
     imgs = [item for item in batch]
     return imgs
 
-# @stopwatch("(2)-load_single")
+
+@stopwatch("(2)-load_single")
 def load_single(dataloader: DataLoader) -> None:
     try:
         _ = next(iter(dataloader))
     except (StopIteration, EOFError) as e:
         print(f"Exception raised: {str(e)}")
 
-# @stopwatch("(2)-load_all")
+
+@stopwatch("(2)-load_all")
 def load_all(dataloader: DataLoader) -> None:
     try:
         for i, batch in enumerate(dataloader):
@@ -38,8 +32,8 @@ def load_all(dataloader: DataLoader) -> None:
             # if isinstance(data, torch.utils.data.DataLoader)
             # print(f"{len(batch)}, {i}, {len(dataloader)}")
             pass
-    except (StopIteration, EOFError) as e:
-        print(f"Exception raised: {str(e)}")
+    except (StopIteration, EOFError, Exception) as e:
+        print(f"Exception raised : {e}")
 
 
 @stopwatch("(1)-benchmark")
@@ -47,11 +41,24 @@ def benchmark_scratch_dataloader(args):
     action_player = ActionPlayer()
 
     # bm = BechmarkDataloader(batch_size=int(args[0]), num_workers=int(args[1]), limit=False)
-    # if args[2] == "async":
-    #     dl = bm.create_dataloader("async")
-    # else:
-    #     dl = bm.create_dataloader("torch")
-    dl = DataLoader(
+
+
+    _dataset = S3Dataset(mode="val", bucket_name="iarai-playground")
+    _dataset.load_index()
+    # print(_dataset.__getitem__(1))
+    # print(_dataset.__len__())
+
+    dl = None
+    if args[2] == "async":
+        dl = AsynchronousLoader(
+            data=_dataset,
+            batch_size=int(args[0]),
+            num_workers=int(args[1]),
+            shuffle=False,
+            device=torch.device("cuda"),
+            collate_fn=collate)
+    else:
+        dl = DataLoader(
                 dataset=_dataset,
                 batch_size=8,
                 num_workers=2,
@@ -64,6 +71,6 @@ def benchmark_scratch_dataloader(args):
     torch.utils.data._utils.worker._worker_loop = _worker_loop
 
     print(f"Warmup ... batch {args[0]}, workers {args[1]}")
-    action_player.benchmark("loading_with_dataloader", load_single(dl), 10, True)
+    action_player.benchmark("loading_with_dataloader", lambda: load_single(dl), 10, True)
     print("Warmup -- end")
-    action_player.benchmark("loading_with_dataloader", load_all(dl), 5, True)
+    action_player.benchmark("loading_with_dataloader", lambda: load_all(dl), 1, True)
