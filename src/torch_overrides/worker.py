@@ -213,6 +213,7 @@ def _generate_state(base_seed, worker_id):
         state.append(data_val)
     return state
 
+
 @stopwatch("(3)-worker_loop")
 def _worker_loop(
     dataset_kind,

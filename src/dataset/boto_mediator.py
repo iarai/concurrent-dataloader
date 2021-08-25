@@ -2,6 +2,7 @@ import importlib
 import json
 import re
 from io import BytesIO
+
 from PIL import Image
 
 
@@ -16,9 +17,12 @@ def get_s3_cred() -> json:
 # boto cannot be used in classes as is not pickable
 boto_module = importlib.import_module("boto3")
 keys = get_s3_cred()
-s3_client = boto_module.resource("s3", aws_access_key_id=keys["access_key"],
-                                 aws_secret_access_key=keys["secret"],
-                                 endpoint_url="http://s3.amazonaws.com")
+s3_client = boto_module.resource(
+    "s3",
+    aws_access_key_id=keys["access_key"],
+    aws_secret_access_key=keys["secret"],
+    endpoint_url="http://s3.amazonaws.com",
+)
 
 
 def load_index() -> list:
@@ -40,9 +44,6 @@ def save_index() -> None:
     with open("index-s3.json", "w") as file:
         json.dump(str_paths, file)
 
-
-# def get_client():
-#     return s3_client
 
 def getitem(index: int = 1) -> Image:
     b = BytesIO()

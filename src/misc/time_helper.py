@@ -5,7 +5,6 @@ from functools import wraps
 from typing import Any
 from typing import Dict
 from typing import Union
-import logging 
 
 import numpy as np
 
@@ -47,6 +46,7 @@ class TimeHelper:
             )
         return {"total": total, "mean": mean_execution_time, "min": min(diffs), "max": max(diffs)}
 
+
 def stopwatch(trace_name):
     def time_profiler(method):
         @wraps(method)
@@ -60,5 +60,7 @@ def stopwatch(trace_name):
             else:
                 print(f"({trace_name}) {method.__name__} id ({id(method)}) {(te - ts) * 1000} ms")
             return result
+
         return time_profile
+
     return time_profiler

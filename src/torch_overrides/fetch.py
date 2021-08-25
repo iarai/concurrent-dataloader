@@ -2,10 +2,10 @@ r""""Contains definitions of the methods used by the _BaseDataLoaderIter to fetc
 data from an iterable-style or map-style dataset. This logic is shared in both
 single- and multi-processing data loading.
 """
-
+import asyncio
 import concurrent.futures
 import functools
-import asyncio
+
 from misc.time_helper import stopwatch
 
 
@@ -52,6 +52,7 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
         else:
             data = self.dataset[possibly_batched_index]
         return self.collate_fn(data)
+
 
 class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):

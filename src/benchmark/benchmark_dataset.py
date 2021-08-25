@@ -2,11 +2,8 @@ import json
 import logging
 from typing import Type
 
-from torch.utils.data import dataloader
-
 from action_player.action_player import ActionPlayer
 from action_player.mp_action_player import MPActionPlayer
-# from dataset.s3_dataset import S3Dataset
 from dataset.s3_clean_dataset import S3Dataset
 from dataset.scratch_dataset import ScratchDataset
 
@@ -59,11 +56,7 @@ def benchmark_s3_storage(dataset: str = "val", mp: bool = False) -> None:
     logging.info("Starting benchmark ... Using S3")
     # test dataloader with scratch
     benchmark_data_loader(
-        S3Dataset(
-            mode=dataset, bucket_name="iarai-playground",
-        ),
-        skip_indexing=True,
-        mp=mp,
+        S3Dataset(mode=dataset, bucket_name="iarai-playground",), skip_indexing=True, mp=mp,
     )
 
 

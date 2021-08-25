@@ -23,22 +23,22 @@ def load_single(dataloader: DataLoader) -> None:
 @stopwatch("(2)-load_all")
 def load_all(dataloader: DataLoader) -> None:
     try:
-        for i, batch in enumerate(dataloader):
-            # if i % 10 == 0:
-            # if isinstance(data, torch.utils.data.DataLoader)
-            # print(f"{len(batch)}, {i}, {len(dataloader)}")
+        # loading the data, replace with i, batch -> print(f"{len(batch)}, {i}, {len(dataloader)}")
+        for _, _ in enumerate(dataloader):
             pass
-    except (StopIteration, EOFError, Exception) as e:
+    except (StopIteration, EOFError) as e:
+        print(f"Exception raised : {e}")
+    except Exception as e:
         print(f"Exception raised : {e}")
 
 
 def collate(batch: List) -> Tensor:
-    imgs = [item for item in batch]
+    imgs = [item for item in batch]  # noqa
     return imgs
 
 
 @stopwatch("(1)-benchmark")
-def benchmark_s3_dataloader(batch_size: int, num_workers:int , data_loader_type: str) -> None:
+def benchmark_s3_dataloader(batch_size: int, num_workers: int, data_loader_type: str) -> None:
     action_player = ActionPlayer()
 
     _dataset = S3Dataset(mode="val", bucket_name="iarai-playground")
@@ -52,15 +52,11 @@ def benchmark_s3_dataloader(batch_size: int, num_workers:int , data_loader_type:
             num_workers=num_workers,
             shuffle=False,
             device=torch.device("cuda"),
-            collate_fn=collate)
+            collate_fn=collate,
+        )
     else:
         data_loader = DataLoader(
-            dataset=_dataset,
-            batch_size=8,
-            num_workers=2,
-            shuffle=False,
-            collate_fn=collate,
-            prefetch_factor=2,
+            dataset=_dataset, batch_size=8, num_workers=2, shuffle=False, collate_fn=collate, prefetch_factor=2,
         )
 
     # override the _worker_loop to inject @stopwatch
@@ -69,6 +65,6 @@ def benchmark_s3_dataloader(batch_size: int, num_workers:int , data_loader_type:
     print(f"Warmup ... batch {batch_size}, workers {num_workers}")
     action_player.benchmark("loading_with_dataloader", lambda: load_single(data_loader), 10, True)
     print("Warmup -- end")
-    
-    # real benchmark 
+
+    # real benchmark
     action_player.benchmark("loading_with_dataloader", lambda: load_all(data_loader), 1, True)

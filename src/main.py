@@ -1,6 +1,5 @@
 import argparse
 import logging
-import sys
 
 from action_player.mp_action_player import MPActionPlayer
 from benchmark.benchmark_dataloader import benchmark_s3_dataloader
@@ -23,12 +22,12 @@ def handle_arguments() -> argparse.ArgumentParser:
         default="random_gpu",
     )
     parser.add_argument("-m", "--dataset", help="Default dataset (val or train)", default="val")
-    parser.add_argument("-args", "--args", nargs='+', help="Additional arguments")
+    parser.add_argument("-args", "--args", nargs="+", help="Additional arguments")
     return parser
 
 
 if __name__ == "__main__":
-    # logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.ERROR)
     action_repeat = 5
     verbose = True
 
@@ -44,20 +43,35 @@ if __name__ == "__main__":
     elif args.action == "scratch":
         benchmark_scratch_storage(dataset)
     elif args.action == "random_gpu":
-        benchmark_tensor_loading(load_random_tensor_on_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose)
-        benchmark_tensor_loading(load_random_tensor_on_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose)
+        benchmark_tensor_loading(
+            load_random_tensor_on_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose
+        )
+        benchmark_tensor_loading(
+            load_random_tensor_on_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose
+        )
     elif args.action == "random_to_gpu":
-        benchmark_tensor_loading(load_random_tensor_to_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose)
-        benchmark_tensor_loading(load_random_tensor_to_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose)
+        benchmark_tensor_loading(
+            load_random_tensor_to_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose
+        )
+        benchmark_tensor_loading(
+            load_random_tensor_to_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose
+        )
     elif args.action == "single_image":
-        benchmark_tensor_loading(load_local_image_to_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose)
-        benchmark_tensor_loading(load_local_image_to_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose)
+        benchmark_tensor_loading(
+            load_local_image_to_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose
+        )
+        benchmark_tensor_loading(
+            load_local_image_to_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose
+        )
     elif args.action == "random_image":
-        benchmark_tensor_loading(load_random_local_image_to_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose)
-        benchmark_tensor_loading(load_random_local_image_to_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose)
+        benchmark_tensor_loading(
+            load_random_local_image_to_gpu, warmup_cycle=False, action_repeat=action_repeat, verbose=verbose
+        )
+        benchmark_tensor_loading(
+            load_random_local_image_to_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose
+        )
     elif args.action == "mp":
-        pass
-        #benchmark_tensor_loading(load_local_image_to_gpu, True, action_repeat, verbose=verbose)
+        # benchmark_tensor_loading(load_local_image_to_gpu, True, action_repeat, verbose=verbose)
         rng = RandomGenerator()
         mpap = MPActionPlayer(rng, num_workers=8, pool_size=4)
         benchmark_tensor_loading(load_local_image_to_gpu, True, action_repeat, mpap, verbose=verbose)

@@ -35,7 +35,7 @@ class AsynchronousLoader(object):
     def __init__(
         self,
         data: Union[DataLoader, Dataset],
-        device: torch.device = torch.device("cuda", 0),
+        device: torch.device = torch.device("cuda", 0),  # noqa
         q_size: int = 10,
         num_batches: Optional[int] = None,
         **kwargs: Any,

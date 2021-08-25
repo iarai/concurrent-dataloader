@@ -1,11 +1,10 @@
 import logging
 from multiprocessing import Pool
 from multiprocessing import set_start_method
-from os import POSIX_FADV_NOREUSE
-from random import Random
 from typing import Callable
-from numpy import random as npr
+
 from action_player.action_player import ActionPlayer
+from numpy import random as npr
 
 try:
     set_start_method("spawn")
@@ -28,18 +27,15 @@ class MPActionPlayer(ActionPlayer):
         logging.debug("Repeating {action_name} {repeat_action} times!")
         action_name = action_name + "_pooled_run_" + action.__name__ + "_" + str(pool_id)
         print(action_name)
-        for i in range(repeat_action):
+        for _ in range(repeat_action):
             self.stopwatch.record(action_name)
             action()
             self.stopwatch.record(action_name)
         return self.stopwatch.get_results(action_name, False)["total"]
-        # action()
 
     def benchmark(self, action_name: str, action: Callable, repeat: int, verbose: bool = False) -> None:
-        pass
         # each worker is assigned a number of repetitions (so in total still "repeat" number of actions)
         with Pool(self.pool_size) as pool:
-           results = pool.starmap(self.run, [(action_name, action, repeat // self.num_workers)] * self.num_workers)
-        # print(results)
-        # if verbose:
-        #     logging.info(f"Results (time per paralel process): {results}, sum = {sum(results)}")
+            results = pool.starmap(self.run, [(action_name, action, repeat // self.num_workers)] * self.num_workers)
+        if verbose:
+            logging.info(f"Results (time per paralel process): {results}, sum = {sum(results)}")

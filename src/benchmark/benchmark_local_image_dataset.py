@@ -55,7 +55,7 @@ def benchmark_tensor_loading(
     warmup_cycle: bool = False,
     action_repeat: int = 10,
     action_player: Type[ActionPlayer] = None,
-    verbose = False
+    verbose=False,
 ) -> None:
 
     if action_player is None:

@@ -1,38 +1,22 @@
 import importlib
-import json
-import re
-from io import BytesIO
 
-from PIL import Image
 from misc.random_generator import RandomGenerator
+from misc.time_helper import stopwatch
+from PIL import Image
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
-from misc.time_helper import stopwatch
-import importlib
 
 
 class S3Dataset(Dataset):
-    def __init__(
-            self,
-            mode: str,
-            bucket_name: str,
-            limit: int = None,
-    ) -> None:
+    def __init__(self, mode: str, bucket_name: str, limit: int = None,) -> None:
         self.limit = limit
         self.mode = "scratch/imagenet/" + mode
-        self.transform = transforms.Compose(
-            [
-                transforms.Grayscale(num_output_channels=1),
-                transforms.ToTensor(),
-            ]
-        )
+        self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
         self.bucket_name = bucket_name
         self.rng = RandomGenerator()
-        self.pickle_buffer = BytesIO()
 
         boto_module = importlib.import_module("dataset.boto_mediator")
         self.len = len(boto_module.image_paths)
-
 
     def index_all(self) -> None:
         pass
