@@ -1,8 +1,9 @@
 import json
 import os
-import random
 from pathlib import Path
 
+from misc.random_generator import RandomGenerator
+from misc.time_helper import stopwatch
 from PIL import Image
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
@@ -11,12 +12,13 @@ IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 
 
 class ScratchDataset(Dataset):
-    def __init__(self, imagenet_path: str, mode: str) -> None:
+    def __init__(self, imagenet_path: str, mode: str, limit: int = None) -> None:
         self.mode = mode
+        self.limit = limit
         self.image_paths = []
         assert mode in ["train", "val"], mode
-        self.transform =  transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
-
+        self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
+        self.rng = RandomGenerator()
         self.__imagenet_path = Path(os.path.join(imagenet_path, mode))
 
     def index_all(self) -> None:
@@ -37,13 +39,17 @@ class ScratchDataset(Dataset):
         [self.image_paths.append(Path(i)) for i in __str_paths]
 
     def get_random_item(self) -> Image:
-        rn = random.randint(0, self.__len__() - 1)
+        rn = self.rng.get_int(0, self.__len__() - 1)
         return self.__getitem__(rn)
 
+    @stopwatch("(5)-get_item")
     def __getitem__(self, index) -> Image:
         image_path = self.image_paths[index]
         image = Image.open(image_path)
         return self.transform(image)
 
     def __len__(self) -> int:
-        return len(self.image_paths)
+        if self.limit is None:
+            return len(self.image_paths)
+        else:
+            return len(self.image_paths[: self.limit])

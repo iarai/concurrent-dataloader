@@ -1,5 +1,6 @@
-from typing import Callable
 import logging
+from typing import Callable
+
 from misc.time_helper import TimeHelper
 
 
@@ -11,9 +12,11 @@ class ActionPlayer:
     def reset(self) -> None:
         self.stopwatch.reset()
 
-    def benchmark(self, action_name: str, action: Callable, repeat: int) -> None:
+    def benchmark(self, action_name: str, action: Callable, repeat: int, verbose: bool = False) -> None:
         for i in range(repeat):
+            print(f"Benchmark starts: {i}")
             self.stopwatch.record(action_name + "_" + str(i))
             action()
             self.stopwatch.record(action_name + "_" + str(i))
-        self.stopwatch.get_results(action_name)
+            print(f"Benchmark done: {i}")
+        self.stopwatch.get_results(action_name, verbose)

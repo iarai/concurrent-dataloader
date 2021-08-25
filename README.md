@@ -1,4 +1,4 @@
-### Storage Benchmarking
+## Storage Benchmarking
 
 Work in progress...
 
@@ -10,13 +10,17 @@ or to see help:
 
 `python3 main.py -help`
 
-```bash
-me@lnx-slim-2:.../storage-benchmarking$ conda-bash
-(base) me@lnx-slim-2:.../storage-benchmarking$ conda activate storage-benchmarking
-(storage-benchmarking) me@lnx-slim-2:.../storage-benchmarking$ pre-commit run --all
-```
+## Activate conda environment @lnx-slim-2
+
+ 1) `conda-bash`
+ 2) `conda env create -f environment.yml`
+ 3) `conda activate storage-benchmarking`
+
+## Pre-commit checkup
+
+ `pre-commit run --all`
 
 
-#### Todo-reminder
+## Execution order - benchmark time points
 
-- [ ] - Check out `https://docs.nvidia.com/deeplearning/dali/user-guide/docs/examples/frameworks/pytorch/pytorch-basic_example.html`
+![Exec path](doc/exec-path.png)

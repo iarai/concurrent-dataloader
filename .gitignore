@@ -5,6 +5,7 @@ __pycache__/
 
 #s3 cred
 s3_credentials.json
+output/
 
 # C extensions
 *.so
@@ -142,3 +143,7 @@ dmypy.json
 
 # Cython debug symbols
 cython_debug/
+
+output
+output_s3
+src/benchmark_output/*
