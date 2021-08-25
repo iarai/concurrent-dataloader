@@ -9,7 +9,7 @@ import pandas.core.frame
 
 IGNORE_LIST = ["Data size", "Warmup", "Benchmark", "Action", "iarai-playground"]
 
-WHAT = "scratch"  # or scratch
+WHAT = "s3"  # or scratch
 SYNC_FILES = glob.glob(f"./benchmark_output/{WHAT}/*_sync.txt")
 ASYNC_FILES = glob.glob(f"./benchmark_output/{WHAT}/*_async.txt")
 FILES = sorted(ASYNC_FILES) + sorted(SYNC_FILES)
@@ -29,8 +29,8 @@ def correct_misshapen_lines(file_path: str) -> None:
 def plot_all(time_dict, plot_max=True, log_scale=True, title=None):
     pos_x = 0
     pos_y = 0
-    titles = ["getitem", "fetch", "worker", "load_all", "benchmark_scratch_dataloader", "2-1"]
-    _, ax = plt.subplots(3, 2)
+    titles = ["getitem", "fetch", "worker", "load_all", "benchmark_dataloader", "2-1"]
+    fig, ax = plt.subplots(3, 2)
     for action in range(5):
         means = []
         medians = []
@@ -80,6 +80,16 @@ def plot_all(time_dict, plot_max=True, log_scale=True, title=None):
         if pos_x >= 3:
             pos_x = 0
             pos_y += 1
+
+    # pretty output
+    fig.subplots_adjust(
+        top=0.980,
+        bottom=0.100,
+        left=0.045,
+        right=0.980,
+        hspace=0.415,
+        wspace=0.130
+    )
     # add fetch - get_item
 
     plt.show()
@@ -121,8 +131,8 @@ if __name__ == "__main__":
         r = csv_df.query('function_name == "load_all"')
         print(f"load all {len(r)}")
         all_times.append(r.time)
-        r = csv_df.query('function_name == "benchmark_scratch_dataloader"')
-        print(f"benchmark_scratch_dataloader {len(r)}")
+        r = csv_df.query('function_name == "benchmark_dataloader"')
+        print(f"benchmark_dataloader {len(r)}")
         all_times.append(r.time)
         time_dict[working_file_path] = all_times
 
