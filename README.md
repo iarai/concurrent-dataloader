@@ -24,4 +24,3 @@ or to see help:
 ## Execution order - benchmark time points
 
 ![Exec path](doc/exec-path.png)
-
