@@ -28,7 +28,7 @@ def handle_arguments() -> argparse.ArgumentParser:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.ERROR)
-    action_repeat = 5
+    action_repeat = 16
     verbose = True
 
     # interpret arguments
@@ -71,12 +71,12 @@ if __name__ == "__main__":
             load_random_local_image_to_gpu, warmup_cycle=True, action_repeat=action_repeat, verbose=verbose
         )
     elif args.action == "mp":
-        # benchmark_tensor_loading(load_local_image_to_gpu, True, action_repeat, verbose=verbose)
+        benchmark_tensor_loading(load_local_image_to_gpu, True, action_repeat, verbose=verbose)
         rng = RandomGenerator()
         mpap = MPActionPlayer(rng, num_workers=8, pool_size=4)
         benchmark_tensor_loading(load_local_image_to_gpu, True, action_repeat, mpap, verbose=verbose)
-        # benchmark_tensor_loading(load_random_tensor_to_gpu, True, action_repeat, action_player, verbose=verbose)
-        # benchmark_tensor_loading(load_random_tensor_on_gpu, True, action_repeat, action_player, verbose=verbose)
+        benchmark_tensor_loading(load_random_tensor_to_gpu, True, action_repeat, mpap, verbose=verbose)
+        benchmark_tensor_loading(load_random_tensor_on_gpu, True, action_repeat, mpap, verbose=verbose)
     elif args.action == "dataloader":
         batch_size = int(args.args[0])
         num_workers = int(args.args[1])

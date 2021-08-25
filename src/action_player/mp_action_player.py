@@ -4,7 +4,6 @@ from multiprocessing import set_start_method
 from typing import Callable
 
 from action_player.action_player import ActionPlayer
-from numpy import random as npr
 
 try:
     set_start_method("spawn")
@@ -20,13 +19,12 @@ class MPActionPlayer(ActionPlayer):
         self.num_workers = num_workers
         self.pool_size = pool_size
         self.rng = rng
-        print(rng.get_next_int())
 
     def run(self, action_name: str, action: Callable, repeat_action: int = 20):
-        pool_id = npr.randint(0, 1000)
+        pool_id = self.rng.get_int(0, 1000)  # npr.randint(0, 1000)
         logging.debug("Repeating {action_name} {repeat_action} times!")
         action_name = action_name + "_pooled_run_" + action.__name__ + "_" + str(pool_id)
-        print(action_name)
+        print(f"Repeating... {repeat_action}")
         for _ in range(repeat_action):
             self.stopwatch.record(action_name)
             action()
@@ -35,6 +33,7 @@ class MPActionPlayer(ActionPlayer):
 
     def benchmark(self, action_name: str, action: Callable, repeat: int, verbose: bool = False) -> None:
         # each worker is assigned a number of repetitions (so in total still "repeat" number of actions)
+        assert repeat >= self.num_workers, "Number of repetitions needs to be higher than number of workers..."
         with Pool(self.pool_size) as pool:
             results = pool.starmap(self.run, [(action_name, action, repeat // self.num_workers)] * self.num_workers)
         if verbose:

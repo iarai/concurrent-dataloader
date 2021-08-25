@@ -16,6 +16,7 @@ class TimeHelper:
         self.recordings = defaultdict(list)
 
     def record(self, name: str) -> None:
+        print(f"Record started ... {name}")
         self.recordings[name].append(time.time())
 
     def reset(self) -> None:
