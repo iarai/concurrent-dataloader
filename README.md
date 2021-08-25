@@ -16,6 +16,10 @@ or to see help:
  2) `conda env create -f environment.yml`
  3) `conda activate storage-benchmarking`
 
+If using `tu-` server with A100:
+
+`conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c nvidia`
+
 ## Pre-commit checkup
 
  `pre-commit run --all`
