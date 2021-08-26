@@ -7,11 +7,12 @@ import numpy as np
 import pandas as pd
 import pandas.core.frame
 
-IGNORE_LIST = ["Data size", "Warmup", "Benchmark", "Action", "iarai-playground"]
+IGNORE_LIST = ["Data size", "Warmup", "Benchmark", "Action", "iarai-playground", "Record started ..."]
 
-WHAT = "s3"  # or scratch
-SYNC_FILES = glob.glob(f"./benchmark_output/{WHAT}/*_sync.txt")
-ASYNC_FILES = glob.glob(f"./benchmark_output/{WHAT}/*_async.txt")
+# WHAT = "s3"  # or scratch, s3
+WHAT = "s3-tu-fat-3"  # or scratch, s3
+SYNC_FILES = glob.glob(f"../benchmark_output/{WHAT}/*_sync.txt")
+ASYNC_FILES = glob.glob(f"../benchmark_output/{WHAT}/*_async.txt")
 FILES = sorted(ASYNC_FILES) + sorted(SYNC_FILES)
 
 
@@ -116,6 +117,7 @@ if __name__ == "__main__":
 
         # get the CSV object
         csv_df = get_csv(working_file_path)
+        # print(csv_df.head())
         csv_df.columns = ["function", "function_name", "id", "function_id", "time", "ms"]  # noqa
 
         all_times = []
@@ -123,6 +125,7 @@ if __name__ == "__main__":
         print(f"Get item {len(r)}")
         all_times.append(r.time)
         r = csv_df.query('function_name == "fetch"')
+        # r = csv_df.query('function_name == "threadedmapdataset-fetcher"')
         print(f"Fetch {len(r)}")
         all_times.append(r.time)
         r = csv_df.query('function_name == "_worker_loop"')
