@@ -146,5 +146,4 @@ cython_debug/
 
 output
 output_s3
-src/benchmark_output/s3/*.txt
-src/benchmark_output/scratch/*.txt
+src/benchmark_output/

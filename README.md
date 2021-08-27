@@ -105,4 +105,6 @@ number of workers, 2, 4, 8, 16, 32, respectfully.
 
 ![Exec path](doc/storage-s3.png)
 
+### S3 (tu-fat-3)
 
+![Exec path](doc/storage-s3-tu-fat3.png)
