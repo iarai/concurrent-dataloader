@@ -10,6 +10,7 @@ from benchmark.benchmark_local_image_dataset import load_local_image_to_gpu
 from benchmark.benchmark_local_image_dataset import load_random_local_image_to_gpu
 from benchmark.benchmark_local_image_dataset import load_random_tensor_on_gpu
 from benchmark.benchmark_local_image_dataset import load_random_tensor_to_gpu
+from misc.logging_configuration import initialize_logging
 from misc.random_generator import RandomGenerator
 
 
@@ -27,7 +28,8 @@ def handle_arguments() -> argparse.ArgumentParser:
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.ERROR)
+
+    initialize_logging(loglevel=logging.INFO)
     action_repeat = 16
     verbose = True
 

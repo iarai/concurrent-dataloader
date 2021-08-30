@@ -1130,7 +1130,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #
     #
     #   if len(sys.argv) != 4:
-    #       print("Usage: ", sys.argv[0], " tmp_dirname iteration (send|recv)")
+    #       logging.info("Usage: ", sys.argv[0], " tmp_dirname iteration (send|recv)")
     #       sys.exit(1)
     #
     #   if __name__ == '__main__':
@@ -1150,7 +1150,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #               fd = os.open(dummy_path(i), os.O_WRONLY | os.O_CREAT)
     #               ancdata = array.array('i', [fd])
     #               msg = bytes([i % 256])
-    #               print("Sending fd ", fd, " (iteration #", i, ")")
+    #               logging.info("Sending fd ", fd, " (iteration #", i, ")")
     #               client.sendmsg([msg], [(socket.SOL_SOCKET, socket.SCM_RIGHTS, ancdata)])
     #
     #
@@ -1162,18 +1162,18 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #
     #           os.mkdir(dirname)
     #
-    #           print("Opening socket...")
+    #           logging.info("Opening socket...")
     #           server = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
     #           server.bind(sock_path)
     #
-    #           print("Listening...")
+    #           logging.info("Listening...")
     #           for i in range(iterations):
     #               a = array.array('i')
     #               msg, ancdata, flags, addr = server.recvmsg(1, socket.CMSG_SPACE(a.itemsize))
     #               assert(len(ancdata) == 1)
     #               cmsg_level, cmsg_type, cmsg_data = ancdata[0]
     #               a.frombytes(cmsg_data)
-    #               print("Received fd ", a[0], " (iteration #", i, ")")
+    #               logging.info("Received fd ", a[0], " (iteration #", i, ")")
     #
     #           shutil.rmtree(dirname)
     #

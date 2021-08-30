@@ -1,9 +1,10 @@
+import logging
 from typing import List
 
 import torch
 from action_player.action_player import ActionPlayer
 from data_loader.async_data_loader import AsynchronousLoader
-from dataset.s3_clean_dataset import S3Dataset
+from dataset.s3_dataset import S3Dataset
 from misc.time_helper import stopwatch
 from torch.functional import Tensor
 from torch_overrides.dataloader import DataLoader
@@ -17,19 +18,19 @@ def load_single(dataloader: DataLoader) -> None:
     try:
         _ = next(iter(dataloader))
     except (StopIteration, EOFError) as e:
-        print(f"Exception raised: {str(e)}")
+        logging.info(f"Exception raised: {str(e)}")
 
 
 @stopwatch("(2)-load_all")
 def load_all(dataloader: DataLoader) -> None:
     try:
-        # loading the data, replace with i, batch -> print(f"{len(batch)}, {i}, {len(dataloader)}")
+        # loading the data, replace with i, batch -> logging.info(f"{len(batch)}, {i}, {len(dataloader)}")
         for _, _ in enumerate(dataloader):
             pass
     except (StopIteration, EOFError) as e:
-        print(f"Exception raised : {e}")
+        logging.info(f"Exception raised : {e}")
     except Exception as e:
-        print(f"Exception raised : {e}")
+        logging.info(f"Exception raised : {e}")
 
 
 def collate(batch: List) -> Tensor:
@@ -62,9 +63,9 @@ def benchmark_dataloader(batch_size: int, num_workers: int, data_loader_type: st
     # override the _worker_loop to inject @stopwatch
     torch.utils.data._utils.worker._worker_loop = _worker_loop
 
-    print(f"Warmup ... batch {batch_size}, workers {num_workers}")
+    logging.info(f"Warmup ... batch {batch_size}, workers {num_workers}")
     action_player.benchmark("loading_with_dataloader", lambda: load_single(data_loader), 10, True)
-    print("Warmup -- end")
+    logging.info("Warmup -- end")
 
     # real benchmark
     action_player.benchmark("loading_with_dataloader", lambda: load_all(data_loader), 1, True)

@@ -46,7 +46,7 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
 
     @stopwatch("(4)-mapdataset-fetcher")
     def fetch(self, possibly_batched_index):
-        # print("Overriden... {possibly_batched_index}")
+        # logging.info("Overriden... {possibly_batched_index}")
         if self.auto_collation:
             data = [self.dataset[idx] for idx in possibly_batched_index]
         else:
