@@ -322,7 +322,7 @@ def _worker_loop(
                         # `ExceptionWrapper` does the correct thing.
                         # See NOTE [ Python Traceback Reference Cycle Problem ]
                         data = ExceptionWrapper(where="in DataLoader worker process {}".format(worker_id))
-            # print(f"Worker data: {worker_id} fetching {index}, {idx}")
+            # logging.info(f"Worker data: {worker_id} fetching {index}, {idx}")
             data_queue.put((idx, data))
             del data, idx, index, r  # save memory
     except KeyboardInterrupt:

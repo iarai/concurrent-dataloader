@@ -1,17 +1,20 @@
 import json
 import os
 from pathlib import Path
+from typing import Optional
 
+from dataset.indexed_dataset import IndexedDataset
 from misc.random_generator import RandomGenerator
 from misc.time_helper import stopwatch
+from overrides import overrides
 from PIL import Image
-from torch.utils.data.dataset import Dataset
 from torchvision import transforms
 
+# TODO magic string constants in code
 IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 
 
-class ScratchDataset(Dataset):
+class ScratchDataset(IndexedDataset):
     def __init__(self, imagenet_path: str, mode: str, limit: int = None) -> None:
         self.mode = mode
         self.limit = limit
@@ -21,23 +24,14 @@ class ScratchDataset(Dataset):
         self.rng = RandomGenerator()
         self.__imagenet_path = Path(os.path.join(imagenet_path, mode))
 
-    def index_all(self) -> None:
+    def index_all(self, file_name: Optional[str], **kwargs) -> None:
+        # TODO magic string constants JPEG -> extract as param
         self.image_paths = list(self.__imagenet_path.rglob("**/*.JPEG"))
+        if file_name is not None:
+            with open(file_name, "w") as file:
+                json.dump([(str(i)) for i in self.image_paths], file)
 
-    def save_index(self) -> None:
-        str_paths = []
-        [str_paths.append(str(i)) for i in self.image_paths]
-        with open("index.json", "w") as file:
-            json.dump(str_paths, file)
-
-    def load_index(self) -> None:
-        __str_paths = None
-        with open("index.json", "r") as file:
-            __str_paths = json.load(file)
-        if self.image_paths is not None:
-            self.image_paths.clear()
-        [self.image_paths.append(Path(i)) for i in __str_paths]
-
+    @overrides
     def get_random_item(self) -> Image:
         rn = self.rng.get_int(0, self.__len__() - 1)
         return self.__getitem__(rn)

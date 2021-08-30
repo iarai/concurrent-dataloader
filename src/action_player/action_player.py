@@ -14,9 +14,10 @@ class ActionPlayer:
 
     def benchmark(self, action_name: str, action: Callable, repeat: int, verbose: bool = False) -> None:
         for i in range(repeat):
-            print(f"Benchmark starts: {i}")
+            logging.info(f"Benchmark starts: {i}")
             self.stopwatch.record(action_name + "_" + str(i))
+
             action()
             self.stopwatch.record(action_name + "_" + str(i))
-            print(f"Benchmark done: {i}")
+            logging.info(f"Benchmark done: {i}")
         self.stopwatch.get_results(action_name, verbose)

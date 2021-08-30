@@ -1,3 +1,4 @@
+import logging
 import statistics
 import time
 from collections import defaultdict
@@ -16,7 +17,7 @@ class TimeHelper:
         self.recordings = defaultdict(list)
 
     def record(self, name: str) -> None:
-        print(f"Record started ... {name}")
+        logging.info(f"Record for ... {name}")
         self.recordings[name].append(time.time())
 
     def reset(self) -> None:
@@ -38,7 +39,7 @@ class TimeHelper:
                 stdev = statistics.stdev(diffs)
             elif len(diff) == 0:
                 return {"total": total, "mean": mean_execution_time, "min": 0, "max": 0}
-            print(
+            logging.info(
                 f"Action '{name}' (repeated {action_counter} times): "
                 f"Mean exec-time: {mean_execution_time}ms, "
                 f"Per action (i.e. file): {total} files/s "
@@ -55,11 +56,8 @@ def stopwatch(trace_name):
             ts = time.time()
             result = method(*args, **kw)
             te = time.time()
-            if "log_time" in kw:
-                name = kw.get("log_name", method.__name__.upper())
-                kw["log_time"][name] = int((te - ts) * 1000)
-            else:
-                print(f"({trace_name}) {method.__name__} id ({id(method)}) {(te - ts) * 1000} ms")
+            # TODO Let's use logger and message in a standard format and parser?
+            print(f"({trace_name}) {method.__name__} id ({id(method)}) {(te - ts) * 1000} ms")
             return result
 
         return time_profile
