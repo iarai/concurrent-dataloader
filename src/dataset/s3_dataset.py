@@ -8,27 +8,26 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import tqdm
-from PIL import Image
-from overrides import overrides
-from torchvision import transforms
-
 from dataset.indexed_dataset import IndexedDataset
 from misc.random_generator import RandomGenerator
 from misc.s3_helpers import get_s3_bucket
 from misc.time_helper import stopwatch
+from overrides import overrides
+from PIL import Image
+from torchvision import transforms
 
 
 # TODO  #32 extract index file operations to super class and use common format for scratch and s3?
 class S3Dataset(IndexedDataset):
     def __init__(
-            self,
-            bucket_name: str,
-            index_file: Path,
-            index_file_download_url: Optional[str] = None,
-            limit: int = None,
-            aws_access_key_id: Optional[str] = None,
-            aws_secret_access_key: Optional[str] = None,
-            endpoint_url: Optional[str] = None,
+        self,
+        bucket_name: str,
+        index_file: Path,
+        index_file_download_url: Optional[str] = None,
+        limit: int = None,
+        aws_access_key_id: Optional[str] = None,
+        aws_secret_access_key: Optional[str] = None,
+        endpoint_url: Optional[str] = None,
     ) -> None:
 
         self.aws_access_key_id = aws_access_key_id
@@ -36,7 +35,7 @@ class S3Dataset(IndexedDataset):
         self.endpoint_url = endpoint_url
         self.index_file = index_file
         self.limit = limit
-        self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(), ])
+        self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
         self.bucket_name = bucket_name
         self.rng = None
 
@@ -96,10 +95,10 @@ class S3Dataset(IndexedDataset):
 
     @staticmethod
     def index_all(
-            credentials_json="s3_dataset_configuration.json",
-            index_file: Optional[str] = None,
-            file_ending="JPEG",
-            prefix: str = "scratch/imagenet",
+        credentials_json="s3_dataset_configuration.json",
+        index_file: Optional[str] = None,
+        file_ending="JPEG",
+        prefix: str = "scratch/imagenet",
     ) -> None:
         s3_bucket = get_s3_bucket(credentials_json=credentials_json)
         data = [str(o.key) for o in s3_bucket.objects.filter(Prefix=prefix).all() if o.key.endswith(file_ending)]
@@ -113,8 +112,11 @@ class S3Dataset(IndexedDataset):
             self.image_paths = json.load(file)
 
 
-def s3_to_s3_copy(from_credentials="s3_dataset_configuration.json", to_credentials="s3_dataset_configuration_temp_copy.json",
-                  index_file_path="index-s3-val.json") -> None:
+def s3_to_s3_copy(
+    from_credentials="s3_dataset_configuration.json",
+    to_credentials="s3_dataset_configuration_temp_copy.json",
+    index_file_path="index-s3-val.json",
+) -> None:
     logging.info("Starting Copying ... Using S3")
 
     from_config = json.load(open(from_credentials))
@@ -128,10 +130,16 @@ def s3_to_s3_copy(from_credentials="s3_dataset_configuration.json", to_credentia
     target_dataset = S3Dataset(index_file=Path(index_file_path), **to_config)
     target_dataset.lazy_init()
 
-    logging.info(f"Uploading index file {index_file_path} to bucket {to_config['bucket_name']} at endpoint url {to_config.get('endpoint_url', None)}")
+    logging.info(
+        f"Uploading index file {index_file_path} "
+        f"to bucket {to_config['bucket_name']} at endpoint url {to_config.get('endpoint_url', None)}"
+    )
     target_dataset.s3_bucket.upload_file(index_file_path, index_file_path)
     logging.info(
-        f"Uploading {len(source_dataset)} files from bucket {from_config['bucket_name']} at endpoint url {from_config.get('endpoint_url', None)}  to bucket {to_config['bucket_name']} at endpoint url {to_config.get('endpoint_url', None)}")
+        f"Uploading {len(source_dataset)} files "
+        f"from bucket {from_config['bucket_name']} at endpoint url {from_config.get('endpoint_url', None)}  "
+        f"to bucket {to_config['bucket_name']} at endpoint url {to_config.get('endpoint_url', None)}"
+    )
     for f in tqdm.tqdm(source_dataset.image_paths):
         temp = NamedTemporaryFile()
         source_dataset.s3_bucket.download_file(f, temp.name)

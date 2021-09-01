@@ -32,9 +32,6 @@ if __name__ == "__main__":  # noqa: C901
 
     initialize_logging(loglevel=logging.INFO)
 
-    s3_to_s3_copy()
-    raise
-
     action_repeat = 16
     verbose = True
 
