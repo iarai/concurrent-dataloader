@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 #s3 cred
-src/s3_credentials.json
+src/s3_dataset_configuration.json
 output/
 
 # C extensions
