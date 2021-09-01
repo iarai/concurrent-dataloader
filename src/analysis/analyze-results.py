@@ -18,7 +18,6 @@ WHITELIST = [
     "(1)-benchmark",
 ]
 
-# WHAT = "s3"  # or scratch, s3
 WHAT = "s3-tu-fat-3"  # or scratch, s3
 SYNC_FILES = glob.glob(f"../benchmark_output/{WHAT}/*_sync.txt")
 ASYNC_FILES = glob.glob(f"../benchmark_output/{WHAT}/*_async.txt")

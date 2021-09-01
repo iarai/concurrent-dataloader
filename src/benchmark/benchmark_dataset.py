@@ -1,8 +1,9 @@
 import logging
-from typing import Type
+from pathlib import Path
 
 from action_player.action_player import ActionPlayer
 from action_player.mp_action_player import MPActionPlayer
+from dataset.indexed_dataset import IndexedDataset
 from dataset.s3_dataset import S3Dataset
 from dataset.scratch_dataset import ScratchDataset
 
@@ -10,7 +11,7 @@ IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
 
 
 # main function that defines the testing order ... e.g. index, load, save
-def benchmark_data_loader(data_loader_instance: Type[S3Dataset], skip_indexing: bool = False, mp: bool = False) -> None:
+def benchmark_data_loader(data_loader_instance: IndexedDataset, skip_indexing: bool = False, mp: bool = False) -> None:
     action_player = None
     if not mp:
         action_player = ActionPlayer()
@@ -52,5 +53,11 @@ def benchmark_s3_storage(dataset: str = "val", mp: bool = False) -> None:
     logging.info("Starting benchmark ... Using S3")
     # test dataloader with scratch
     benchmark_data_loader(
-        S3Dataset(mode=dataset, bucket_name="iarai-playground",), skip_indexing=True, mp=mp,
+        S3Dataset(
+            bucket_name="iarai-playground",
+            index_file=Path("index-s3-val.json"),
+            index_file_download_url="s3://iarai-playground/scratch/imagenet/index-s3-val.json",
+        ),
+        skip_indexing=True,
+        mp=mp,
     )

@@ -10,6 +10,7 @@ from benchmark.benchmark_local_image_dataset import load_local_image_to_gpu
 from benchmark.benchmark_local_image_dataset import load_random_local_image_to_gpu
 from benchmark.benchmark_local_image_dataset import load_random_tensor_on_gpu
 from benchmark.benchmark_local_image_dataset import load_random_tensor_to_gpu
+from dataset.s3_dataset import s3_to_s3_copy
 from misc.logging_configuration import initialize_logging
 from misc.random_generator import RandomGenerator
 
@@ -27,9 +28,13 @@ def handle_arguments() -> argparse.ArgumentParser:
     return parser
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # noqa: C901
 
     initialize_logging(loglevel=logging.INFO)
+
+    s3_to_s3_copy()
+    raise
+
     action_repeat = 16
     verbose = True
 
@@ -40,6 +45,8 @@ if __name__ == "__main__":
     # load dataset
     dataset = args.dataset
 
+    if args.action == "s3_to_s3_copy":
+        s3_to_s3_copy(*args.args)
     if args.action == "s3":
         benchmark_s3_storage(dataset, mp=True)
     elif args.action == "scratch":

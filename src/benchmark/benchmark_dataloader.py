@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import List
 
 import torch
@@ -42,7 +43,11 @@ def collate(batch: List) -> Tensor:
 def benchmark_dataloader(batch_size: int, num_workers: int, data_loader_type: str) -> None:
     action_player = ActionPlayer()
 
-    _dataset = S3Dataset(mode="val", bucket_name="iarai-playground")
+    _dataset = S3Dataset(
+        bucket_name="iarai-playground",
+        index_file=Path("index-s3-val.json"),
+        index_file_download_url="s3://iarai-playground/scratch/imagenet/index-s3-val.json",
+    )
     _dataset.load_index()
 
     data_loader = None
