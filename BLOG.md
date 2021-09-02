@@ -118,6 +118,8 @@ results are grouped, using the same batch size, but different a number of worker
 
 TODO: discuss our worker async and S3 dataset decorator
 
+TODO: run with noop-trainer and plot pure data loading times for different batch sizes. This should result in some guidelines on how fast/slow a training process can be to still run at max possible speed
+
 ## Suggested Improvements Staging to Compute
 
 TODO: discuss idea like full decoupling
