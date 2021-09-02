@@ -52,7 +52,7 @@ Then, we will discuss our improvements and future work.
 
 ## Analysis Staging to Compute
 
-We first need a baseline at which compute consumes
+We first need a baseline at which compute consumes.... Benchmark how fast training loop is with zero-data 
 
 TODO....
 
