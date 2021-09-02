@@ -112,6 +112,7 @@ class S3Dataset(IndexedDataset):
             self.image_paths = json.load(file)
 
 
+# TODO put to different location? target should be no dataset, but only bucket?
 def s3_to_s3_copy(
     from_credentials="s3_dataset_configuration.json",
     to_credentials="s3_dataset_configuration_temp_copy.json",
