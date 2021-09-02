@@ -81,7 +81,7 @@ class S3Dataset(IndexedDataset):
         return self.__getitem__(rn)
 
     @stopwatch("(5)-get_item")
-    def __getitem__(self, index: int) -> Image:
+    def __getitem__(self, index: int, **kwargs) -> Image:
         self.lazy_init()
         b = BytesIO()
         self.s3_bucket.download_fileobj(self.image_paths[index], b)
