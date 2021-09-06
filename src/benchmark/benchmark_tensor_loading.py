@@ -1,5 +1,6 @@
 import argparse
 import logging
+import sys
 from functools import partial
 from pathlib import Path
 from typing import Callable
@@ -64,12 +65,12 @@ def load_random_tensor_to_gpu(device: str = "cuda:0") -> None:
 
 def benchmark_tensor_loading(
     create_tensor_fn: Callable,
+    output_base_folder: Path,
     warmup_cycle: bool = False,
     action_repeat: int = 10,
     action_player: Type[ActionPlayer] = None,
     device: str = "cuda:0",
 ) -> None:
-
     if action_player is None:
         action_player = ActionPlayer()
 
@@ -84,7 +85,10 @@ def benchmark_tensor_loading(
             torch.rand(256, 256, device=torch.device(device))
         action_name = action_name + "_with_warmup"
     action_player.benchmark(
-        action_name=action_name, action=partial(create_tensor_fn, device=device), repeat=action_repeat
+        action_name=action_name,
+        action=partial(create_tensor_fn, device=device),
+        repeat=action_repeat,
+        output_base_folder=output_base_folder,
     )
 
 
@@ -103,43 +107,111 @@ def handle_arguments() -> argparse.ArgumentParser:
     return parser
 
 
+# TODO we should not use data from warmup cycle!!!
 def main(*args):
     parser = handle_arguments()
     args = parser.parse_args(args)
     device = args.device
     action_repeat = args.action_repeat
-    init_benchmarking(args)
+    output_base_folder = init_benchmarking(args, action="_".join(["benchmark_tensor_loading", args.action]))
 
     if args.action == "random_gpu":
         benchmark_tensor_loading(
-            load_random_tensor_on_gpu, warmup_cycle=False, action_repeat=action_repeat, device=device
+            load_random_tensor_on_gpu,
+            warmup_cycle=False,
+            action_repeat=action_repeat,
+            device=device,
+            output_base_folder=output_base_folder,
         )
         benchmark_tensor_loading(
-            load_random_tensor_on_gpu, warmup_cycle=True, action_repeat=action_repeat, device=device
+            load_random_tensor_on_gpu,
+            warmup_cycle=True,
+            action_repeat=action_repeat,
+            device=device,
+            output_base_folder=output_base_folder,
         )
     elif args.action == "random_to_gpu":
         benchmark_tensor_loading(
-            load_random_tensor_to_gpu, warmup_cycle=False, action_repeat=action_repeat, device=device
+            load_random_tensor_to_gpu,
+            warmup_cycle=False,
+            action_repeat=action_repeat,
+            device=device,
+            output_base_folder=output_base_folder,
         )
         benchmark_tensor_loading(
-            load_random_tensor_to_gpu, warmup_cycle=True, action_repeat=action_repeat, device=device
+            load_random_tensor_to_gpu,
+            warmup_cycle=True,
+            action_repeat=action_repeat,
+            device=device,
+            output_base_folder=output_base_folder,
         )
     elif args.action == "single_image":
         benchmark_tensor_loading(
-            load_local_image_to_gpu, warmup_cycle=False, action_repeat=action_repeat, device=device
+            load_local_image_to_gpu,
+            warmup_cycle=False,
+            action_repeat=action_repeat,
+            device=device,
+            output_base_folder=output_base_folder,
         )
-        benchmark_tensor_loading(load_local_image_to_gpu, warmup_cycle=True, action_repeat=action_repeat, device=device)
+        benchmark_tensor_loading(
+            load_local_image_to_gpu,
+            warmup_cycle=True,
+            action_repeat=action_repeat,
+            device=device,
+            output_base_folder=output_base_folder,
+        )
     elif args.action == "random_image":
         benchmark_tensor_loading(
-            load_random_local_image_to_gpu, warmup_cycle=False, action_repeat=action_repeat, device=device
+            load_random_local_image_to_gpu,
+            warmup_cycle=False,
+            action_repeat=action_repeat,
+            device=device,
+            output_base_folder=output_base_folder,
         )
         benchmark_tensor_loading(
-            load_random_local_image_to_gpu, warmup_cycle=True, action_repeat=action_repeat, device=device
+            load_random_local_image_to_gpu,
+            warmup_cycle=True,
+            action_repeat=action_repeat,
+            device=device,
+            output_base_folder=output_base_folder,
         )
     elif args.action == "mp":
-        benchmark_tensor_loading(load_local_image_to_gpu, True, action_repeat, device=device)
-        rng = RandomGenerator()
-        mpap = MPActionPlayer(rng, num_workers=8, pool_size=4)
-        benchmark_tensor_loading(load_local_image_to_gpu, True, action_repeat, mpap, device=device)
-        benchmark_tensor_loading(load_random_tensor_to_gpu, True, action_repeat, mpap, device=device)
-        benchmark_tensor_loading(load_random_tensor_on_gpu, True, action_repeat, mpap, device=device)
+        benchmark_tensor_loading(
+            load_local_image_to_gpu,
+            warmup_cycle=True,
+            action_repeat=action_repeat,
+            device=device,
+            output_base_folder=output_base_folder,
+        )
+        mpap = MPActionPlayer(num_workers=8, pool_size=4)
+        benchmark_tensor_loading(
+            load_local_image_to_gpu,
+            warmup_cycle=True,
+            action_repeat=action_repeat,
+            action_player=mpap,
+            device=device,
+            output_base_folder=output_base_folder,
+        )
+        benchmark_tensor_loading(
+            load_random_tensor_to_gpu,
+            warmup_cycle=True,
+            action_repeat=action_repeat,
+            action_player=mpap,
+            device=device,
+            output_base_folder=output_base_folder,
+        )
+        benchmark_tensor_loading(
+            load_random_tensor_on_gpu,
+            warmup_cycle=True,
+            action_repeat=action_repeat,
+            action_player=mpap,
+            device=device,
+            output_base_folder=output_base_folder,
+        )
+    else:
+        parser.print_help()
+        exit(2)
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:])

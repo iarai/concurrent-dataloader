@@ -115,9 +115,9 @@ def main():
     data_grouped_by_dir = {}
     for working_file_path in files:
         with (working_file_path.parent / "metadata.json").open("r") as f:
-            metadata = json.load(f)
+            metadata = json.load(f)  # noqa
         # TODO refine grouping
-        key = metadata["action"] + "_" + "_".join(metadata["args"])
+        key = "_".join(working_file_path.name.split("_")[1:])
         data_grouped_by_dir.setdefault(key, []).extend(parse_results_log(working_file_path))
 
     time_dict = {}

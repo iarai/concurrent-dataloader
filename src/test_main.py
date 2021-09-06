@@ -69,8 +69,7 @@ def test_benchmark_dataloader(batch_size: int, num_workers: int, data_loader_typ
         )
         results_files = glob.glob(f"{output_base_folder}/**/results-*.log", recursive=True)
 
-        # TODO factor 2 is for warm-up! do we want those logs?
-        assert len(results_files) == num_workers * 2 + 1, results_files
+        assert len(results_files) == num_workers + 1, results_files
         for f in results_files:
             parse_results_log(f)
         metadata_files = glob.glob(f"{output_base_folder}/**/*.json", recursive=True)
@@ -85,7 +84,7 @@ def test_benchmark_dataloader(batch_size: int, num_workers: int, data_loader_typ
 )
 @pytest.mark.skipif(torch.cuda.is_available() is False, reason="Cuda device required.")
 def test_benchmark_local_image_dataset(action: str):
-    from benchmark.benchmark_local_image_dataset import main
+    from benchmark.benchmark_tensor_loading import main
 
     with tempfile.TemporaryDirectory() as temp_dir:
         output_base_folder = Path(temp_dir) / "benchmark_results"

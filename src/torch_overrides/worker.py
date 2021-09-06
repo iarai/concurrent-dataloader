@@ -231,9 +231,10 @@ def _worker_loop(
     num_workers,
     persistent_workers,
     num_fetch_workers,
-    initializer,
+    initializer=None,
 ):
-    initializer()
+    if initializer is not None:
+        initializer()
 
     # See NOTE [ Data Loader Multiprocessing Shutdown Logic ] for details on the
     # logic of this function.
