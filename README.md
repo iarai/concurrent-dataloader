@@ -105,3 +105,10 @@ s3_dataset = S3Dataset.index_all(
 ## Pre-commit checkup
 
 `pre-commit run --all`
+
+
+## Analysis
+```
+sshfs christian.eichenberger@lnx-slim-1.lan.iarai.ac.at:/iarai /iarai
+python analysis/analyze_results.py --output_base_folder /iarai/work/logs/storage_benchmarking
+```
