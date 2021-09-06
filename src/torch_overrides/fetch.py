@@ -57,11 +57,18 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
 
 
 class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
-    def __init__(self, dataset, auto_collation, collate_fn, drop_last):
+    def __init__(self, dataset, auto_collation, collate_fn, drop_last, num_fetch_workers=1):
         super(_ThreadedMapDatasetFetcher, self).__init__(dataset, auto_collation, collate_fn, drop_last)
-        self.thread_pool_size = 3
+        self.thread_pool_size = num_fetch_workers
         self._executor = ThreadPoolExecutor(self.thread_pool_size)
-        self.loop = asyncio.get_event_loop()
+        try:
+            self.loop = asyncio.get_event_loop()
+        except RuntimeError:
+            pass  # log here...
+        finally:
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+        # print(f"Fetching with {num_fetch_workers}")
 
     def _fetch_item(self, worker_id: str, index: int) -> torch.Tensor:
         # print(f"Worker {name} downloading {index} ... {os.getpid()}")

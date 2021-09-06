@@ -1,16 +1,20 @@
+import argparse
 import json
 import logging
 import os
+import sys
 from io import BytesIO
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Optional
-from urllib.parse import urlparse
+from typing import Union
 
 import tqdm
 from dataset.indexed_dataset import IndexedDataset
 from misc.random_generator import RandomGenerator
+from misc.s3_helpers import download_file_from_s3_url
 from misc.s3_helpers import get_s3_bucket
+from misc.s3_helpers import upload_file_to_s3_url
 from misc.time_helper import stopwatch
 from overrides import overrides
 from PIL import Image
@@ -22,14 +26,18 @@ class S3Dataset(IndexedDataset):
     def __init__(
         self,
         bucket_name: str,
+        # TODO #32 make this optional, use temp file if not given
         index_file: Path,
+        # TODO should we support only relative paths instead of URLs?
         index_file_download_url: Optional[str] = None,
         limit: int = None,
         aws_access_key_id: Optional[str] = None,
         aws_secret_access_key: Optional[str] = None,
         endpoint_url: Optional[str] = None,
+        **kwargs,
     ) -> None:
 
+        super().__init__(index_file=index_file)
         self.aws_access_key_id = aws_access_key_id
         self.aws_secret_access_key = aws_secret_access_key
         self.endpoint_url = endpoint_url
@@ -40,15 +48,14 @@ class S3Dataset(IndexedDataset):
         self.rng = None
 
         if index_file_download_url is not None and not index_file.exists():
-            s3_loc = urlparse(index_file_download_url, allow_fragments=False)
-            s3_bucket = get_s3_bucket(
-                bucket_name=bucket_name,
+            download_file_from_s3_url(
+                s3_url=index_file_download_url,
+                f=index_file,
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
                 endpoint_url=endpoint_url,
             )
-            s3_bucket.download_file(s3_loc.path, str(index_file))
-            del s3_bucket
+
         self.load_index()
 
         self.len = len(self.image_paths)
@@ -80,6 +87,9 @@ class S3Dataset(IndexedDataset):
         rn = self.rng.get_int(0, self.__len__())
         return self.__getitem__(rn)
 
+    # TODO we should do the do the @stopwatch instrumentalization only in the benchmarking part
+    #  and keep this code clean from those aspects!
+    # TODO #32 make this agnostic to Image or whatever
     @stopwatch("(5)-get_item")
     def __getitem__(self, index: int, **kwargs) -> Image:
         self.lazy_init()
@@ -95,29 +105,39 @@ class S3Dataset(IndexedDataset):
 
     @staticmethod
     def index_all(
-        credentials_json="s3_dataset_configuration.json",
-        index_file: Optional[str] = None,
+        bucket_name: str,
+        index_file: Optional[Union[str, Path]] = None,
         file_ending="JPEG",
         prefix: str = "scratch/imagenet",
+        aws_access_key_id: Optional[str] = None,
+        aws_secret_access_key: Optional[str] = None,
+        endpoint_url: Optional[str] = None,
+        index_file_upload_path: Optional[Union[str, Path]] = None,
     ) -> None:
-        s3_bucket = get_s3_bucket(credentials_json=credentials_json)
+        s3_bucket = get_s3_bucket(
+            bucket_name=bucket_name,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+            endpoint_url=endpoint_url,
+        )
         data = [str(o.key) for o in s3_bucket.objects.filter(Prefix=prefix).all() if o.key.endswith(file_ending)]
+        logging.info("Indexed %s image_paths", len(data))
         if index_file is not None:
+            logging.info("Writing to %s", index_file)
             with open(index_file, "w") as f:
                 json.dump(data, f)
 
-    def load_index(self) -> None:
+            if index_file_upload_path is not None:
+                upload_file_to_s3_url(
+                    s3_url=index_file_upload_path,
+                    f=index_file,
+                    aws_access_key_id=aws_access_key_id,
+                    aws_secret_access_key=aws_secret_access_key,
+                    endpoint_url=endpoint_url,
+                )
 
-        with open(self.index_file, "r") as file:
-            self.image_paths = json.load(file)
 
-
-# TODO put to different location? target should be no dataset, but only bucket?
-def s3_to_s3_copy(
-    from_credentials="s3_dataset_configuration.json",
-    to_credentials="s3_dataset_configuration_temp_copy.json",
-    index_file_path="index-s3-val.json",
-) -> None:
+def s3_to_s3_copy(from_credentials: Path, to_credentials: Path, index_file_path: Path,) -> None:
     logging.info("Starting Copying ... Using S3")
 
     from_config = json.load(open(from_credentials))
@@ -135,9 +155,9 @@ def s3_to_s3_copy(
         f"Uploading index file {index_file_path} "
         f"to bucket {to_config['bucket_name']} at endpoint url {to_config.get('endpoint_url', None)}"
     )
-    target_dataset.s3_bucket.upload_file(index_file_path, index_file_path)
+    target_dataset.s3_bucket.upload_file(str(index_file_path), str(index_file_path))
     logging.info(
-        f"Uploading {len(source_dataset)} files "
+        f"Uploading {len(source_dataset)} image_paths "
         f"from bucket {from_config['bucket_name']} at endpoint url {from_config.get('endpoint_url', None)}  "
         f"to bucket {to_config['bucket_name']} at endpoint url {to_config.get('endpoint_url', None)}"
     )
@@ -146,3 +166,21 @@ def s3_to_s3_copy(
         source_dataset.s3_bucket.download_file(f, temp.name)
         target_dataset.s3_bucket.upload_file(temp.name, f)
     logging.info("End Copying ... Using S3")
+
+
+def handle_arguments() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--from_credentials", type=Path, default=Path("s3_iarai_playground_imagenet.json"))
+    parser.add_argument("--to_credentials", type=Path, default=Path("s3_credentials_eks.json"))
+    parser.add_argument("--index_file_path", type=Path, default=Path("index-s3-val.json"))
+    return parser
+
+
+def main(*args):
+    parser = handle_arguments()
+    args = parser.parse_args(args)
+    s3_to_s3_copy(**vars(args))
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:])

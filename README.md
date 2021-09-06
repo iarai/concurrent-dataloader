@@ -68,3 +68,17 @@ Here, `s3_dataset_configuration.json` looks like this:
 ```
 Notice that if we do not pass credentials directly, `boto3` will look them up in the standard locations according to https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html.
 However, this files give us the flexibility to use custom s3 locations flexibly with relying on a central aws configuration and make these configurations shareable.
+
+### Creating the index file
+
+Create a local index for data in a s3 bucket:
+```
+s3_dataset = S3Dataset.index_all(
+   index_file=Path("index-t4c.json"),
+   file_ending="_8ch.h5",
+   prefix="scratch/neun_t4c/raw",
+   bucket_name="iarai-playground",
+   # TODO use relative path within the bucket?
+   index_file_upload_path="s3://scratch/neun_t4c/t4c21-index.json"
+)
+```

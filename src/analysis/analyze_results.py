@@ -1,38 +1,13 @@
-import glob
-import io
+import json
 import logging
+from json import JSONDecodeError
+from pathlib import Path
+from typing import Dict
+from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pandas.core.frame
-
-# TODO use standard format for events, json?
-WHITELIST = [
-    "(3)-worker_loop",
-    "(4)-mapdataset-fetcher",
-    "(4)-threadedmapdataset-fetcher",
-    "(5)-get_item",
-    "(2)-load_single",
-    "(2)-load_all",
-    "(1)-benchmark",
-]
-
-WHAT = "s3-tu-fat-3"  # or scratch, s3
-SYNC_FILES = glob.glob(f"../benchmark_output/{WHAT}/*_sync.txt")
-ASYNC_FILES = glob.glob(f"../benchmark_output/{WHAT}/*_async.txt")
-FILES = sorted(ASYNC_FILES) + sorted(SYNC_FILES)
-
-
-# remove wrong line breaks
-def correct_misshapen_lines(file_path: str) -> None:
-    __file_text = ""
-    with open(file_path, "r") as f:
-        __file_text = f.read()
-
-    __file_text = __file_text.replace("ms((", "ms\n((")
-    with open(file_path, "w") as f:
-        f.write(__file_text)
 
 
 def plot_all(time_dict, plot_max=True, log_scale=True, title=None):
@@ -98,49 +73,57 @@ def plot_all(time_dict, plot_max=True, log_scale=True, title=None):
     plt.show()
 
 
-def get_csv(file_path: str) -> pandas.core.frame.DataFrame:
-    __lines_list = []
-    with open(file_path, "r") as f:
-        for _, line in enumerate(f):
-            if any(w in line for w in WHITELIST):
-                __lines_list.append(line)
-    __joined_line = io.StringIO("\n".join(__lines_list))
-    return pd.read_csv(__joined_line, sep=" ", low_memory=False, error_bad_lines=False, index_col=False)
-
-
-# TODO write test
-def parse_working_file_path(working_file_path):
-    logging.info(f"Working with {working_file_path}")
-    # change lines containing ms(( -> ms \n ((
-    correct_misshapen_lines(working_file_path)
-    # get the CSV object
-    csv_df = get_csv(working_file_path)
-    csv_df.columns = ["function", "function_name", "id", "function_id", "time", "ms"]  # noqa
-    csv_df["time"] = csv_df["time"].astype(float)
+def group_by_function_name(csv_df: pd.DataFrame) -> List[pd.DataFrame]:
     all_times = []
     r = csv_df.query('function_name == "__getitem__"')
     logging.info(f"Get item {len(r)}")
-    all_times.append(r.time)
+    all_times.append(r.process_time)
     r = csv_df.query('function_name == "fetch"')
     logging.info(f"Fetch {len(r)}")
-    all_times.append(r.time)
+    all_times.append(r.process_time)
     r = csv_df.query('function_name == "_worker_loop"')
     logging.info(f"Worker loop {len(r)}")
-    all_times.append(r.time)
+    all_times.append(r.process_time)
     r = csv_df.query('function_name == "load_all"')
     logging.info(f"load all {len(r)}")
-    all_times.append(r.time)
+    all_times.append(r.process_time)
     r = csv_df.query('function_name == "benchmark_dataloader"')
     logging.info(f"benchmark_dataloader {len(r)}")
-    all_times.append(r.time)
+    all_times.append(r.process_time)
     return all_times
 
 
+def parse_results_log(working_file_path: str) -> List[Dict]:
+    with open(working_file_path, "r") as f:
+        skipped_lines_count = 0
+        data = []
+        for line in f:
+            try:
+                data.append(json.loads(line))
+            except JSONDecodeError:
+                skipped_lines_count += 1
+    if skipped_lines_count > 0:
+        logging.warning("Skipped %s lines while reading %s", skipped_lines_count, working_file_path)
+    return data
+
+
 def main():
+    # TODO make configurable in cli,
+    # TODO read metadata as well
+    # TODO filter on metadata as well
+    files = Path(".").rglob("**/results-*.log")
+    data_grouped_by_dir = {}
+    for working_file_path in files:
+        with (working_file_path.parent / "metadata.json").open("r") as f:
+            metadata = json.load(f)
+        # TODO refine grouping
+        key = metadata["action"] + "_" + "_".join(metadata["args"])
+        data_grouped_by_dir.setdefault(key, []).extend(parse_results_log(working_file_path))
+
     time_dict = {}
-    for working_file_path in FILES:
-        all_times = parse_working_file_path(working_file_path)
-        time_dict[working_file_path] = all_times
+    for dir, data in data_grouped_by_dir.items():
+        time_dict[dir] = group_by_function_name(pd.DataFrame.from_records(data=data))
+
     plot_all(time_dict, plot_max=True, log_scale=True)
 
 

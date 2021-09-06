@@ -41,7 +41,7 @@ repos:
             flake8-copyright, # Adds copyright checks to flake8
             flake8-deprecated, # Warns about deprecated method calls.
             flake8-eradicate, # Flake8 plugin to find commented out code
-            flake8-license, # flake8 plugin which verifies that source files contain license, header at the top.
+            flake8-license, # flake8 plugin which verifies that source image_paths contain license, header at the top.
             flake8-pytest, # pytest assert checker plugin for flake8
             flake8-tabs, # Tab (or Spaces) indentation style checker for flake8
             pep8-naming, # Check PEP-8 naming conventions, plugin for flake8

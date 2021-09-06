@@ -1,4 +1,6 @@
 [flake8]
 max-line-length = 120
 max-complexity = 10
+# https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html
+select = B,C,E,F,P,T4,W,B,B950
 extend-ignore = E231 # due to conflict with black

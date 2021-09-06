@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -10,32 +9,30 @@ from overrides import overrides
 from PIL import Image
 from torchvision import transforms
 
-# TODO magic string constants in code
-IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
-
 
 class ScratchDataset(IndexedDataset):
-    def __init__(self, imagenet_path: str, mode: str, limit: int = None) -> None:
-        self.mode = mode
+    def __init__(self, index_file: Path, limit: int = None) -> None:
+        super().__init__(index_file=index_file)
         self.limit = limit
-        self.image_paths = []
-        assert mode in ["train", "val"], mode
         self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
         self.rng = RandomGenerator()
-        self.__imagenet_path = Path(os.path.join(imagenet_path, mode))
 
-    def index_all(self, file_name: Optional[str], **kwargs) -> None:
+    @staticmethod
+    def index_all(imagenet_path: Path, file_name: Optional[str], **kwargs) -> None:
         # TODO magic string constants JPEG -> extract as param
-        self.image_paths = list(self.__imagenet_path.rglob("**/*.JPEG"))
+        image_paths = list(imagenet_path.rglob("**/*.JPEG"))
         if file_name is not None:
             with open(file_name, "w") as file:
-                json.dump([(str(i)) for i in self.image_paths], file)
+                json.dump([(str(i)) for i in image_paths], file)
 
     @overrides
     def get_random_item(self) -> Image:
         rn = self.rng.get_int(0, self.__len__() - 1)
         return self.__getitem__(rn)
 
+    # TODO we should do the do the @stopwatch instrumentalization only in the benchmarking part and
+    #  keep this code clean from those aspects! Decorator for decorator...?
+    # TODO we should make this code independent of the underlying dataset, not necessarily images/imagenet?
     @stopwatch("(5)-get_item")
     def __getitem__(self, index) -> Image:
         image_path = self.image_paths[index]

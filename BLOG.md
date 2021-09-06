@@ -1,7 +1,7 @@
 # Fast Remote Storage Data Loading with PyTorch
 
 ### Motivation
-Currently, ML data pipelines start from the premise of having all data local on fast storage before starting training. If we have larger input datasets and not enough or not fast enough local disks (for instance in containerized environments), this approach is doomed.  
+Currently, ML data pipelines start from the premise of having all data local on fast storage before starting training. If we have larger input datasets and not enough or not fast enough local disks (for instance in containerized environments), this approach is doomed.
 
 In particular, if the data set is too large to be downloaded entirely before training or because only a subset is needed in a distributed training situation on each worker node, we want to fetch data from remote object storage in a way that saturates GPU usage at max.
 
@@ -52,7 +52,7 @@ Then, we will discuss our improvements and future work.
 
 ## Analysis Staging to Compute
 
-We first need a baseline at which compute consumes.... Benchmark how fast training loop is with zero-data 
+We first need a baseline at which compute consumes.... Benchmark how fast training loop is with zero-data
 
 TODO....
 

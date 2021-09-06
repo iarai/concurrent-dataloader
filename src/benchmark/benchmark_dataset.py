@@ -1,4 +1,7 @@
+import argparse
+import json
 import logging
+import sys
 from pathlib import Path
 
 from action_player.action_player import ActionPlayer
@@ -6,58 +9,128 @@ from action_player.mp_action_player import MPActionPlayer
 from dataset.indexed_dataset import IndexedDataset
 from dataset.s3_dataset import S3Dataset
 from dataset.scratch_dataset import ScratchDataset
-
-IMAGENET_PATH_SCRATCH = "/scratch/imagenet"
-
+from dataset.t4c_s3_dataset import HDF5S3MODE
+from dataset.t4c_s3_dataset import T4CDataset
+from main import init_benchmarking
 
 # main function that defines the testing order ... e.g. index, load, save
-def benchmark_data_loader(data_loader_instance: IndexedDataset, skip_indexing: bool = False, mp: bool = False) -> None:
-    action_player = None
+
+
+def benchmark_dataset(
+    dataset: IndexedDataset,
+    output_base_folder: Path,
+    skip_indexing: bool = True,
+    mp: bool = False,
+    pool_size: int = 5,
+    num_load_index=5,
+    num_get_random_item=10000,
+) -> None:
+    # TODO once we have all options from cli, we may get rid of this
+    with (output_base_folder / "benchmark_dataloader.json").open("w") as f:
+        json.dump(
+            {
+                # TODO log params as well
+                "dataset": str(dataset),
+                "mp": mp,
+                "pool_size": pool_size,
+                "num_load_index": num_load_index,
+                "num_get_random_item": num_get_random_item,
+            },
+            f,
+        )
     if not mp:
         action_player = ActionPlayer()
     else:
         assert skip_indexing, "Indexing cannot be performed by Multi-Processing ActionPlayer"
-        action_player = MPActionPlayer()
+        action_player = MPActionPlayer(pool_size=pool_size)
 
     # ls (index) all images
     if not skip_indexing:
         logging.info("Indexing")
-        action_player.benchmark("indexing", data_loader_instance.index_all, 5)
-    else:
-        logging.info("Loading")
-        action_player.benchmark("load_index", data_loader_instance.load_index, 5)
-        action_player.benchmark("loading_random", data_loader_instance.get_random_item, 10000)
-        return
+        # TODO use param
+        action_player.benchmark("indexing", dataset.index_all, 5)
 
     # load random images
-    action_player.benchmark("loading_random", data_loader_instance.get_random_item, 5)
+    action_player.benchmark(
+        action_name="loading_random",
+        action=dataset.get_random_item,
+        repeat=num_get_random_item,
+        output_base_folder=output_base_folder,
+    )
 
     # load index from file
     logging.info("Loading index... ")
-    data_loader_instance.load_index()
+    dataset.load_index()
 
-    action_player.benchmark("load_index", data_loader_instance.load_index, 2)
-    logging.info(f"Loading index... Done. Len {data_loader_instance.__len__()}")
-
-    data_loader_instance.get_random_item()
-    action_player.benchmark("loading_random", data_loader_instance.get_random_item, 2)
-
-
-def benchmark_scratch_storage(dataset: str = "val", mp: bool = False) -> None:
-    logging.info("Starting benchmark ... Using scratch")
-    # test dataloader with scratch
-    benchmark_data_loader(ScratchDataset(IMAGENET_PATH_SCRATCH, dataset), mp=mp)
-
-
-def benchmark_s3_storage(dataset: str = "val", mp: bool = False) -> None:
-    logging.info("Starting benchmark ... Using S3")
-    # test dataloader with scratch
-    benchmark_data_loader(
-        S3Dataset(
-            bucket_name="iarai-playground",
-            index_file=Path("index-s3-val.json"),
-            index_file_download_url="s3://iarai-playground/scratch/imagenet/index-s3-val.json",
-        ),
-        skip_indexing=True,
-        mp=mp,
+    action_player.benchmark(
+        action_name="load_index",
+        action=dataset.load_index,
+        repeat=num_load_index,
+        output_base_folder=output_base_folder,
     )
+    logging.info(f"Loading index... Done. Len {dataset.__len__()}")
+
+
+def handle_arguments() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-a",
+        "--action",
+        help="An option to benchmark (s3, scratch, random_gpu, random_to_gpu, random_image)",
+        default="random_gpu",
+    )
+    parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
+    parser.add_argument("-args", "--args", nargs="+", help="Additional arguments")
+    return parser
+
+
+def main(*args):
+    parser = handle_arguments()
+    args = parser.parse_args(args)
+    output_base_folder = init_benchmarking(args, action=args.action)
+
+    # -------------------------------------
+    # benchmark_dataset
+    # -------------------------------------
+    if args.action == "t4c":
+        benchmark_dataset(
+            # TODO magic constants... extract to cli... how to do in a generic way...
+            dataset=T4CDataset(
+                **json.load(open("s3_iarai_playground_t4c21.json")),
+                index_file=Path("index-t4c.json"),
+                mode=HDF5S3MODE[args.args[0]],
+            ),
+            skip_indexing=True,
+            mp=True,
+            # TODO magic constants... extract to cli... how to do in a generic way...
+            num_load_index=0,
+            num_get_random_item=5,
+            pool_size=5,
+            output_base_folder=output_base_folder,
+        )
+
+    elif args.action == "s3":
+        benchmark_dataset(
+            S3Dataset(
+                # TODO magic constants... extract to cli... how to do in a generic way...
+                bucket_name="iarai-playground",
+                index_file=Path("index-s3-val.json"),
+                index_file_download_url="s3://iarai-playground/scratch/imagenet/index-s3-val.json",
+            ),
+            skip_indexing=True,
+            mp=False,
+            output_base_folder=output_base_folder,
+        )
+    elif args.action == "scratch":
+        benchmark_dataset(
+            dataset=ScratchDataset(index_file=Path(args.args[0])),
+            output_base_folder=output_base_folder,
+            mp=True,
+            pool_size=4,
+            num_load_index=0,
+            num_get_random_item=55,
+        ),
+
+
+if __name__ == "__main__":
+    main(*sys.argv[1:])

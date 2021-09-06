@@ -3,6 +3,7 @@ r""""Contains definitions of the methods used by the _BaseDataLoaderIter workers
 These **needs** to be in global scope since Py2 doesn't support serializing
 static methods.
 """
+import logging
 import os
 import queue
 import random
@@ -141,7 +142,7 @@ class _ResumeIteration(object):
 # Copyright (c) 2019 NumPy Developers
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
+# of this software and associated documentation image_paths (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
@@ -229,7 +230,11 @@ def _worker_loop(
     worker_id,
     num_workers,
     persistent_workers,
+    num_fetch_workers,
+    initializer,
 ):
+    initializer()
+
     # See NOTE [ Data Loader Multiprocessing Shutdown Logic ] for details on the
     # logic of this function.
     try:
@@ -261,7 +266,9 @@ def _worker_loop(
             if init_fn is not None:
                 init_fn(worker_id)
 
-            fetcher = _DatasetKind.create_fetcher(dataset_kind, dataset, auto_collation, collate_fn, drop_last)
+            fetcher = _DatasetKind.create_fetcher(
+                dataset_kind, dataset, auto_collation, collate_fn, drop_last, num_fetch_workers
+            )
         except Exception:
             init_exception = ExceptionWrapper(where="in DataLoader worker process {}".format(worker_id))
 
@@ -291,7 +298,9 @@ def _worker_loop(
                 data_queue.put((r, None))
                 iteration_end = False
                 # Recreate the fetcher for worker-reuse policy
-                fetcher = _DatasetKind.create_fetcher(dataset_kind, dataset, auto_collation, collate_fn, drop_last)
+                fetcher = _DatasetKind.create_fetcher(
+                    dataset_kind, dataset, auto_collation, collate_fn, drop_last, num_fetch_workers
+                )
                 continue
             elif r is None:
                 # Received the final signal
