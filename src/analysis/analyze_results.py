@@ -12,19 +12,13 @@ import numpy as np
 import pandas as pd
 
 
-def plot_all(time_dict, plot_max=True, log_scale=True, title=None):
-    pos_x = 0
+def plot_all(time_dict, plot_max=True, log_scale=True):
     titles = ["getitem", "fetch", "worker", "load_all", "benchmark_dataloader", "2-1"]
     rows = 5
-    fig, ax = plt.subplots(rows)
+    fig, ax = plt.subplots(rows, len(time_dict) * 2)
     for action in range(5):
-        means = []
-        medians = []
-        mins = []
-        maxs = []
-        labels = []
-
-        for e in time_dict:
+        pos_x = action
+        for i, e in enumerate(time_dict):
             current = time_dict[e]
             # actions: get_item, fetch, _worker_loop,
             _min, _max, _mean, _median = (
@@ -33,37 +27,50 @@ def plot_all(time_dict, plot_max=True, log_scale=True, title=None):
                 current[action].mean(),
                 current[action].median(),
             )
-            mins.append(_min)
+            labels = ["min", "max", "mean", "median"]
+            mins = _min
+            means = _mean
+            medians = _median
+            maxs = _max
+
+            x = np.arange(len(labels))
+            width = 0.2
+
+            _ = ax[pos_x, i * 2].bar(0, means, width, label=f"mean: {_mean:.2f}ms, {_mean / 60000:.2f} m")
+            _ = ax[pos_x, i * 2].bar(1, medians, width, label=f"median: {_median:.2f}ms, {_median / 60000:.2f} m")
+            _ = ax[pos_x, i * 2].bar(2, mins, width, label=f"min: {_min:.2f}ms, {_min / 60000:.2f} m")
             if plot_max:
-                maxs.append(_max)
-            means.append(_mean)
-            medians.append(_median)
-            labels.append(e.split("/")[-1])
+                _ = ax[pos_x, i * 2].bar(3, maxs, width, label=f"max: {_max:.2f}ms, {_max / 60000:.2f} m")
 
-        x = np.arange(len(labels))
-        width = 0.2
+            ax[pos_x, i * 2].set_ylabel(titles[action])
+            ax[pos_x, i * 2].set_title(e)
 
-        _ = ax[pos_x].bar(x + width * 1 + 0.1, means, width, label=f"mean: {_mean:.2f}ms, {_mean / 60000:.2f} m")
-        _ = ax[pos_x].bar(
-            x + width * 2 + 0.1, medians, width, label=f"median: {_median:.2f}ms, {_median / 60000:.2f} m"
-        )
-        _ = ax[pos_x].bar(x + width * 3 + 0.1, mins, width, label=f"min: {_min:.2f}ms, {_min / 60000:.2f} m")
-        if plot_max:
-            _ = ax[pos_x].bar(x + width * 4 + 0.1, maxs, width, label=f"max: {_max:.2f}ms, {_max / 60000:.2f} m")
+            ax[pos_x, i * 2].set_xticks(x)
+            ax[pos_x, i * 2].set_xticklabels(labels, rotation=45, fontsize=8, ha="center")
+            ax[pos_x, i * 2].legend(prop={"size": 8})
+            ax[pos_x, i * 2].grid(which="both")
+            ax[pos_x, i * 2].grid(which="minor", alpha=0.5, linestyle="--")
+            if log_scale:
+                ax[pos_x, i * 2].set_yscale("log")
 
-        ax[pos_x].set_ylabel(titles[action])
-        if title is not None:
-            ax[pos_x].set_title(title)
-
-        ax[pos_x].set_xticks(x)
-        ax[pos_x].set_xticklabels(labels, rotation=45, fontsize=8, ha="center")
-        ax[pos_x].legend(prop={"size": 8})
-        ax[pos_x].grid(which="both")
-        ax[pos_x].grid(which="minor", alpha=0.5, linestyle="--")
-        if log_scale:
-            ax[pos_x].set_yscale("log")
-
-        pos_x += 1
+            if len(current[action]) == 0:
+                continue
+            violin = ax[pos_x, i * 2 + 1].violinplot(
+                current[action].tolist(),
+                vert=False,
+                widths=1.1,
+                showmeans=True,
+                showextrema=True,
+                showmedians=True,
+                quantiles=[0.25, 0.75],
+                bw_method=0.5,
+            )
+            violin["cmeans"].set_color("r")
+            violin["cmedians"].set_linewidth(2)
+            violin["cmaxes"].set_color("grey")
+            violin["cmaxes"].set_linestyle(":")
+            violin["cmins"].set_color("grey")
+            violin["cmins"].set_linestyle(":")
 
     # pretty output
     fig.subplots_adjust(top=0.980, bottom=0.100, left=0.045, right=0.980, hspace=0.415, wspace=0.130)
