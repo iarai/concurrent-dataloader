@@ -1,5 +1,7 @@
+import argparse
 import json
 import logging
+import sys
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Dict
@@ -12,9 +14,9 @@ import pandas as pd
 
 def plot_all(time_dict, plot_max=True, log_scale=True, title=None):
     pos_x = 0
-    pos_y = 0
     titles = ["getitem", "fetch", "worker", "load_all", "benchmark_dataloader", "2-1"]
-    fig, ax = plt.subplots(3, 2)
+    rows = 5
+    fig, ax = plt.subplots(rows)
     for action in range(5):
         means = []
         medians = []
@@ -41,30 +43,27 @@ def plot_all(time_dict, plot_max=True, log_scale=True, title=None):
         x = np.arange(len(labels))
         width = 0.2
 
-        _ = ax[pos_x, pos_y].bar(x + width * 1 + 0.1, means, width, label=f"mean: {_mean:.2f}ms, {_mean / 60000:.2f} m")
-        _ = ax[pos_x, pos_y].bar(
+        _ = ax[pos_x].bar(x + width * 1 + 0.1, means, width, label=f"mean: {_mean:.2f}ms, {_mean / 60000:.2f} m")
+        _ = ax[pos_x].bar(
             x + width * 2 + 0.1, medians, width, label=f"median: {_median:.2f}ms, {_median / 60000:.2f} m"
         )
-        _ = ax[pos_x, pos_y].bar(x + width * 3 + 0.1, mins, width, label=f"min: {_min:.2f}ms, {_min / 60000:.2f} m")
+        _ = ax[pos_x].bar(x + width * 3 + 0.1, mins, width, label=f"min: {_min:.2f}ms, {_min / 60000:.2f} m")
         if plot_max:
-            _ = ax[pos_x, pos_y].bar(x + width * 4 + 0.1, maxs, width, label=f"max: {_max:.2f}ms, {_max / 60000:.2f} m")
+            _ = ax[pos_x].bar(x + width * 4 + 0.1, maxs, width, label=f"max: {_max:.2f}ms, {_max / 60000:.2f} m")
 
-        ax[pos_x, pos_y].set_ylabel(titles[action])
+        ax[pos_x].set_ylabel(titles[action])
         if title is not None:
-            ax[pos_x, pos_y].set_title(title)
+            ax[pos_x].set_title(title)
 
-        ax[pos_x, pos_y].set_xticks(x)
-        ax[pos_x, pos_y].set_xticklabels(labels, rotation=45, fontsize=8, ha="center")
-        ax[pos_x, pos_y].legend(prop={"size": 8})
-        ax[pos_x, pos_y].grid(which="both")
-        ax[pos_x, pos_y].grid(which="minor", alpha=0.5, linestyle="--")
+        ax[pos_x].set_xticks(x)
+        ax[pos_x].set_xticklabels(labels, rotation=45, fontsize=8, ha="center")
+        ax[pos_x].legend(prop={"size": 8})
+        ax[pos_x].grid(which="both")
+        ax[pos_x].grid(which="minor", alpha=0.5, linestyle="--")
         if log_scale:
-            ax[pos_x, pos_y].set_yscale("log")
+            ax[pos_x].set_yscale("log")
 
         pos_x += 1
-        if pos_x >= 3:
-            pos_x = 0
-            pos_y += 1
 
     # pretty output
     fig.subplots_adjust(top=0.980, bottom=0.100, left=0.045, right=0.980, hspace=0.415, wspace=0.130)
@@ -107,20 +106,31 @@ def parse_results_log(working_file_path: str) -> List[Dict]:
     return data
 
 
-def main():
+def handle_arguments() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output_base_folder", type=Path, default=Path("/iarai/work/logs/storage_benchmarking"))
+    return parser
+
+
+def main(*args):
+    parser = handle_arguments()
+    args = parser.parse_args(args)
     # TODO make configurable in cli,
     # TODO read metadata as well
     # TODO filter on metadata as well
-    files = Path(".").rglob("**/results-*.log")
+    files = args.output_base_folder.rglob("**/results-*.log")
     data_grouped_by_dir = {}
     for working_file_path in files:
+        results = parse_results_log(working_file_path)
         with (working_file_path.parent / "metadata.json").open("r") as f:
             metadata = json.load(f)  # noqa
         # TODO refine grouping
-        key = "_".join(working_file_path.name.split("_")[1:])
-        data_grouped_by_dir.setdefault(key, []).extend(parse_results_log(working_file_path))
-
+        key = "_".join(working_file_path.parent.name.split("_")[1:])
+        if len(results) == 0:
+            continue
+        data_grouped_by_dir.setdefault(key, []).extend(results)
     time_dict = {}
+
     for dir, data in data_grouped_by_dir.items():
         time_dict[dir] = group_by_function_name(pd.DataFrame.from_records(data=data))
 
@@ -128,4 +138,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(*sys.argv[1:])
