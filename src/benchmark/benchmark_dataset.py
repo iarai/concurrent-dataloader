@@ -13,6 +13,7 @@ from dataset.t4c_s3_dataset import HDF5S3MODE
 from dataset.t4c_s3_dataset import T4CDataset
 from main import init_benchmarking
 
+
 # main function that defines the testing order ... e.g. index, load, save
 
 
@@ -26,7 +27,7 @@ def benchmark_dataset(
     num_get_random_item=10000,
 ) -> None:
     # TODO once we have all options from cli, we may get rid of this
-    with (output_base_folder / "benchmark_dataloader.json").open("w") as f:
+    with (output_base_folder / "benchmark_dataset.json").open("w") as f:
         json.dump(
             {
                 # TODO log params as well
@@ -87,7 +88,7 @@ def handle_arguments() -> argparse.ArgumentParser:
 def main(*args):
     parser = handle_arguments()
     args = parser.parse_args(args)
-    output_base_folder = init_benchmarking(args, action=args.action)
+    output_base_folder = init_benchmarking(args, action="_".join(["benchmark_dataset", args.action]))
 
     # -------------------------------------
     # benchmark_dataset
@@ -113,23 +114,28 @@ def main(*args):
         benchmark_dataset(
             S3Dataset(
                 # TODO magic constants... extract to cli... how to do in a generic way...
-                bucket_name="iarai-playground",
+                **json.load(open("s3_iarai_playground_imagenet.json")),
                 index_file=Path("index-s3-val.json"),
-                index_file_download_url="s3://iarai-playground/scratch/imagenet/index-s3-val.json",
             ),
             skip_indexing=True,
             mp=False,
             output_base_folder=output_base_folder,
+            num_load_index=0,
+            num_get_random_item=55,
         )
     elif args.action == "scratch":
         benchmark_dataset(
-            dataset=ScratchDataset(index_file=Path(args.args[0])),
+            # TODO magic constants... extract to cli... how to do in a generic way...
+            dataset=ScratchDataset(index_file=Path("index-scratch-val.json")),
             output_base_folder=output_base_folder,
             mp=True,
             pool_size=4,
             num_load_index=0,
             num_get_random_item=55,
-        ),
+        )
+    else:
+        parser.print_help()
+        exit(2)
 
 
 if __name__ == "__main__":

@@ -1,39 +1,58 @@
 ## Storage Benchmarking
 
-Work in progress...
+## Activate conda environment on computes
 
-Use as:
-
-`python3 main.py -a s3`
-
-or to see help:
-
-`python3 main.py -help`
-
-## Activate conda environment @lnx-slim-2
-
- 1) `conda-bash`
- 2) `conda env create -f environment.yml`
- 3) `conda activate storage-benchmarking`
+```
+conda-bash
+conda env update -f environment.yml
+conda activate storage-benchmarking
+```
 
 If using `tu-` server with A100:
 
 `conda install pytorch torchvision torchaudio cudatoolkit=11.1 -c pytorch -c nvidia`
 
-## Pre-commit checkup
-
- `pre-commit run --all`
-
 ## Run experiments
+Work in progress...
 
-Use the provide bash script:
+Use as:
 
-```buildoutcfg
-$ cd src
-
-$ ./run.sh
 ```
-By default, the script uses `s3` storage, however, it can also test `scratch` storage. To change this change `DATASOURCE='s3'` to `scratch`.
+cd src
+export PYTHONPATH=$PWD
+python benchmark/benchmark_tensor_loading.py -a random_gpu
+python benchmark/benchmark_tensor_loading.py -a random_to_gpu
+python benchmark/benchmark_tensor_loading.py -a single_image
+python benchmark/benchmark_tensor_loading.py -a random_image
+python benchmark/benchmark_tensor_loading.py -a mp
+
+
+vi s3_iarai_playground_imagenet.json # see below
+python benchmark/benchmark_dataset.py -a s3
+python -c 'from dataset.scratch_dataset import ScratchDataset; from pathlib import Path; ScratchDataset.index_all(Path("/scratch/imagenet/val"), "index-scratch-val.json")'
+python benchmark/benchmark_dataset.py -a scratch
+
+
+
+python benchmark/benchmark_dataloader.py
+
+
+
+```
+
+
+## sync tu -> gluster
+```
+rsync -Wuva ~/workspaces/storage-benchmarking/src/benchmark_output/ christian.eichenberger@lnx-slim-1.lan.iarai.ac.at:/iarai/work/logs/storage_benchmarking/
+```
+
+
+
+
+
+
+
+
 
 ## `IndexedDataset`
 
@@ -82,3 +101,7 @@ s3_dataset = S3Dataset.index_all(
    index_file_upload_path="s3://scratch/neun_t4c/t4c21-index.json"
 )
 ```
+
+## Pre-commit checkup
+
+`pre-commit run --all`

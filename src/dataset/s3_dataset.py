@@ -36,7 +36,14 @@ class S3Dataset(IndexedDataset):
         endpoint_url: Optional[str] = None,
         **kwargs,
     ) -> None:
-
+        if index_file_download_url is not None and not index_file.exists():
+            download_file_from_s3_url(
+                s3_url=index_file_download_url,
+                f=index_file,
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                endpoint_url=endpoint_url,
+            )
         super().__init__(index_file=index_file)
         self.aws_access_key_id = aws_access_key_id
         self.aws_secret_access_key = aws_secret_access_key
@@ -46,15 +53,6 @@ class S3Dataset(IndexedDataset):
         self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
         self.bucket_name = bucket_name
         self.rng = None
-
-        if index_file_download_url is not None and not index_file.exists():
-            download_file_from_s3_url(
-                s3_url=index_file_download_url,
-                f=index_file,
-                aws_access_key_id=aws_access_key_id,
-                aws_secret_access_key=aws_secret_access_key,
-                endpoint_url=endpoint_url,
-            )
 
         self.load_index()
 

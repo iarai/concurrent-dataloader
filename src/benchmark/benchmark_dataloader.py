@@ -49,6 +49,7 @@ def benchmark_dataloader(
     num_workers: int,
     data_loader_type: str,
     output_base_folder: Path,
+    warmup_repeat=3,
     repeat: int = 10,
     prefetch_factor=2,
     num_fetch_workers=4,
@@ -75,9 +76,8 @@ def benchmark_dataloader(
 
     _dataset = S3Dataset(
         # TODO magic constants
-        bucket_name="iarai-playground",
+        **json.load(open("s3_iarai_playground_imagenet.json")),
         index_file=Path("index-s3-val.json"),
-        index_file_download_url="s3://iarai-playground/scratch/imagenet/index-s3-val.json",
         limit=limit,
     )
     _dataset.load_index()
@@ -106,20 +106,23 @@ def benchmark_dataloader(
 
     # TODO should we do this in a central place?
     # override the _worker_loop to inject @stopwatch
-    assert len(logging.getLogger("stopwatch").handlers) > 0
+    # warmup without logging
+    torch.utils.data._utils.worker._worker_loop = _worker_loop
+
+    # TODO skip logging during warmup?
+    logging.info(f"Warmup ... batch {batch_size}, workers {num_workers}")
+    action_player.benchmark(
+        "loading_with_dataloader_warmup", lambda: load_single(data_loader), repeat=warmup_repeat,
+    )
+    logging.info("Warmup -- end")
+
+    # now with logging
     torch.utils.data._utils.worker._worker_loop = partial(
         _worker_loop,
         initializer=partial(
             initialize_logging, loglevel=logging.getLogger().getEffectiveLevel(), output_base_folder=output_base_folder,
         ),
     )
-
-    logging.info(f"Warmup ... batch {batch_size}, workers {num_workers}")
-    action_player.benchmark(
-        "loading_with_dataloader_warmup", lambda: load_single(data_loader), repeat=repeat,
-    )
-    logging.info("Warmup -- end")
-
     # real benchmark
     action_player.benchmark("loading_with_dataloader", lambda: load_all(data_loader), repeat=repeat)
 
@@ -131,8 +134,8 @@ def handle_arguments() -> argparse.ArgumentParser:
     parser.add_argument("--num_workers", type=int, default=2, help="Additional arguments")
     parser.add_argument("--data_loader_type", type=str, default="sync", help="Additional arguments")
     parser.add_argument("--num_fetch_workers", type=int, default=1, help="Additional arguments")
-    parser.add_argument("--repeat", type=int, default=50, help="Additional arguments")
-    parser.add_argument("--limit", type=int, default=50, help="Additional arguments")
+    parser.add_argument("--repeat", type=int, default=10, help="Additional arguments")
+    parser.add_argument("--limit", type=int, default=20, help="Additional arguments")
     return parser
 
 
@@ -141,7 +144,8 @@ def main(*args):
     args = parser.parse_args(args)
 
     output_base_folder = init_benchmarking(
-        args=args, action="_".join([str(args.batch_size), str(args.num_workers), args.data_loader_type])
+        args=args,
+        action="_".join(["benchmark_dataloader", str(args.batch_size), str(args.num_workers), args.data_loader_type]),
     )
     args = vars(args)
     args["output_base_folder"] = output_base_folder
