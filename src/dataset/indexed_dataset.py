@@ -1,20 +1,23 @@
 import abc
+import json
+from pathlib import Path
 
 from PIL import Image
 from torch.utils.data import Dataset
 
 
 class IndexedDataset(Dataset, abc.ABC):
-    def __init__(self):
-        self.image_paths = self.load_index()
+    def __init__(self, index_file: Path):
+        self.index_file = index_file
+        self.load_index()
 
     @abc.abstractstaticmethod
     def index_all(self, **kwargs) -> None:
         raise NotImplementedError()
 
-    @abc.abstractmethod
     def load_index(self) -> None:
-        raise NotImplementedError()
+        with self.index_file.open("r") as file:
+            self.image_paths = json.load(file)
 
     # TODO should this be part of sampler instead of dataset?
     @abc.abstractmethod

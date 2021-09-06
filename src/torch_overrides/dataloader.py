@@ -5,6 +5,7 @@ functions to be run in multiprocessing. E.g., the data loading worker loop is
 in `./_utils/worker.py`.
 """
 import itertools
+import logging
 import multiprocessing as python_multiprocessing
 import os
 import queue
@@ -59,9 +60,9 @@ class _DatasetKind(object):
     Iterable = 1
 
     @staticmethod
-    def create_fetcher(kind, dataset, auto_collation, collate_fn, drop_last):
+    def create_fetcher(kind, dataset, auto_collation, collate_fn, drop_last, num_fetch_workers=1):
         if kind == _DatasetKind.Map:
-            return _ThreadedMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last)
+            return _ThreadedMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
             # return _MapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last)
         else:
             return _IterableDatasetFetcher(dataset, auto_collation, collate_fn, drop_last)
@@ -191,8 +192,10 @@ class DataLoader(Generic[T_co]):
         generator=None,
         *,
         prefetch_factor: int = 2,
-        persistent_workers: bool = False
+        persistent_workers: bool = False,
+        num_fetch_workers: int = 1
     ):
+        self.num_fetch_workers = num_fetch_workers
         torch._C._log_api_usage_once("python.data_loader")
 
         if num_workers < 0:
@@ -605,7 +608,12 @@ class _SingleProcessDataLoaderIter(_BaseDataLoaderIter):
         assert self._num_workers == 0
 
         self._dataset_fetcher = _DatasetKind.create_fetcher(
-            self._dataset_kind, self._dataset, self._auto_collation, self._collate_fn, self._drop_last
+            self._dataset_kind,
+            self._dataset,
+            self._auto_collation,
+            self._collate_fn,
+            self._drop_last,
+            loader.num_fetch_workers,
         )
 
     def _next_data(self):
@@ -969,6 +977,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                     i,
                     self._num_workers,
                     self._persistent_workers,
+                    loader.num_fetch_workers,
                 ),
             )
             w.daemon = True
@@ -1077,13 +1086,13 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                 # Raise an exception if we are this close to the FDs limit.
                 # Apparently, trying to open only one file is not a sufficient
                 # test.
-                # See NOTE [ DataLoader on Linux and open files limit ]
+                # See NOTE [ DataLoader on Linux and open image_paths limit ]
                 fds_limit_margin = 10
                 fs = [tempfile.NamedTemporaryFile() for i in range(fds_limit_margin)]
             except OSError as e:
                 if e.errno == errno.EMFILE:
                     raise RuntimeError(
-                        "Too many open files. Communication with the"
+                        "Too many open image_paths. Communication with the"
                         " workers is no longer possible. Please increase the"
                         " limit using `ulimit -n` in the shell or change the"
                         " sharing strategy by calling"
@@ -1092,16 +1101,16 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                     ) from None
             raise
 
-    # NOTE [ DataLoader on Linux and open files limit ]
+    # NOTE [ DataLoader on Linux and open image_paths limit ]
     #
     # On Linux when DataLoader is used with multiprocessing we pass the data between
-    # the root process and the workers through SHM files. We remove those files from
+    # the root process and the workers through SHM image_paths. We remove those image_paths from
     # the filesystem as soon as they are created and keep them alive by
     # passing around their file descriptors through AF_UNIX sockets. (See
     # docs/source/multiprocessing.rst and 'Multiprocessing Technical Notes` in
     # the wiki (https://github.com/pytorch/pytorch/wiki).)
     #
-    # This sometimes leads us to exceeding the open files limit. When that happens,
+    # This sometimes leads us to exceeding the open image_paths limit. When that happens,
     # and the offending file descriptor is coming over a socket, the `socket` Python
     # package silently strips the file descriptor from the message, setting only the
     # `MSG_CTRUNC` flag (which might be a bit misleading since the manpage says that
@@ -1116,7 +1125,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     # `torch.multiprocessing`) raises a `RuntimeError: received 0 items of ancdata`
     #
     # Sometimes, instead of the FD being stripped, you may get an `OSError:
-    # Too many open files`, both in the script below and in DataLoader. However,
+    # Too many open image_paths`, both in the script below and in DataLoader. However,
     # this is rare and seems to be nondeterministic.
     #
     #

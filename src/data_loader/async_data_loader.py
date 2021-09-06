@@ -9,8 +9,8 @@ from typing import Union
 import torch
 from torch import Tensor
 from torch._six import string_classes
-from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
+from torch_overrides.dataloader import DataLoader
 
 
 class AsynchronousLoader(object):
@@ -40,7 +40,7 @@ class AsynchronousLoader(object):
         num_batches: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
-        if isinstance(data, torch.utils.data.DataLoader):
+        if isinstance(data, DataLoader):
             self.dataloader = data
         else:
             self.dataloader = DataLoader(data, **kwargs)

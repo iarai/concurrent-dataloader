@@ -1,8 +1,14 @@
 import torch_overrides.dataloader
 import torch_overrides.fetch
 import torch_overrides.worker
+from dataset.s3_file import S3File
 
 torch_overrides.dataloader._MultiProcessingDataLoaderIter
 torch_overrides.dataloader._MultiProcessingDataLoaderIter._try_get_data.fs
 torch_overrides.worker
 torch_overrides.fetch
+
+S3File.seekable
+S3File.readable
+S3File.tell
+S3File.readinto
