@@ -4,11 +4,12 @@ single- and multi-processing data loading.
 """
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from typing import Callable
 from typing import List
-from typing import Type
 
 import torch
 from misc.time_helper import stopwatch
+from torch.utils.data import Dataset
 
 
 class _BaseDatasetFetcher(object):
@@ -57,41 +58,44 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
 
 
 class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
-    def __init__(self, dataset, auto_collation, collate_fn, drop_last, num_fetch_workers=1):
+    def __init__(
+        self, dataset: Dataset, auto_collation: bool, collate_fn: Callable, drop_last: bool, num_fetch_workers: int = 1
+    ):
         super(_ThreadedMapDatasetFetcher, self).__init__(dataset, auto_collation, collate_fn, drop_last)
+        # Initialize a thread pool
         self.thread_pool_size = num_fetch_workers
-        self._executor = ThreadPoolExecutor(self.thread_pool_size)
-        try:
-            self.loop = asyncio.get_event_loop()
-        except RuntimeError:
-            pass  # log here...
-        finally:
-            self.loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(self.loop)
-        # print(f"Fetching with {num_fetch_workers}")
+        self._executor = ThreadPoolExecutor(num_fetch_workers)
+        # Create a new async event loop
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
 
-    def _fetch_item(self, worker_id: str, index: int) -> torch.Tensor:
-        # print(f"Worker {name} downloading {index} ... {os.getpid()}")
-        data = self.dataset.__getitem__(index, worker_name=worker_id)
-        return self.collate_fn(data)
-
-    async def worker(self, worker_id: str, task_queue: asyncio.Queue, result_queue: asyncio.Queue) -> None:
+    async def worker(self, worker_id: int, task_queue: asyncio.Queue, result_queue: asyncio.Queue) -> None:
         while not task_queue.empty():
             index = await task_queue.get()
             try:
-                result = await self.loop.run_in_executor(self._executor, self._fetch_item, worker_id, index)
+                result = await self.loop.run_in_executor(self._executor, self.dataset.__getitem__, index)
+                result = self.collate_fn(result)
                 result_queue.put_nowait((index, result))
             except Exception as e:
                 print(f"Exception in fetch worker {worker_id}: {str(e)}")
             finally:
                 task_queue.task_done()
 
-    async def async_exec(self, batch_indexes: List[int]) -> List[torch.Tensor]:
-        # Create a queue that we will use to store our "workload".
+    async def initiate_fetch_tasks(self, batch_indices: List[int]) -> List[torch.Tensor]:
+        """Creates a list of tasks and initiates their execution using a thread
+        pool.
+
+        Arguments:
+           batch_indices -- a list of integers which represent the index of an
+           item that should be fetched by the dataset
+        Returns:
+           a list of tensor objects sorted in accordance to the batch_indices order
+        """
+        # Create input and output queue, task_, result_ to store the tasks and their results (respectively)
         task_queue = asyncio.Queue()
         result_queue = asyncio.Queue()
         # load indexes into a queue
-        for index in batch_indexes:
+        for index in batch_indices:
             task_queue.put_nowait(index)
 
         # create tasks and run
@@ -99,22 +103,30 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
 
         # await for results
         await asyncio.gather(*tasks, return_exceptions=True)
-        await task_queue.join()
-
-        # Cancel worker tasks.
-        for task in tasks:
-            task.cancel()
-        # Wait until all worker tasks are cancelled.
-        await asyncio.gather(*tasks, return_exceptions=True)
 
         # read the result queue
         result_list = []
         while not result_queue.empty():
             result_list.append(result_queue.get_nowait())
+
         # sort wrt index
-        return result_list.sort(key=lambda tup: tup[0])
+        return result_list.sort(key=lambda v: v[0])
 
     @stopwatch("(4)-threadedmapdataset-fetcher")
-    def fetch(self, batch_indexes: List[int]) -> List[torch.Tensor]:
-        result = self.loop.run_until_complete(self.async_exec(batch_indexes))
+    def fetch(self, batch_indices: List[int]) -> List[torch.Tensor]:
+        """Entrypoint function to async execution. It calls the async function
+        initiate_fetch_tasks that uses batch indices to create a list of tasks
+        that are performed asynchronously.
+
+        - This fetch function cannot be async itself, otherwise, it would need to be awaited by it's caller.
+
+        Arguments:
+           batch_indices -- a list of integers which represent the index of an
+           item that should be fetched by the dataset
+        Returns:
+           a list of tensor objects (fetched items, by the dataset.__getitem__
+           and with the predefined transformations applied)
+        """
+        # create a future that waits for all tasks to complete
+        result = self.loop.run_until_complete(self.initiate_fetch_tasks(batch_indices))
         return result
