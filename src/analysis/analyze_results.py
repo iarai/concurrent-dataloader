@@ -1,102 +1,293 @@
-import argparse
 import json
 import logging
-import sys
+from datetime import timedelta
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Dict
 from typing import List
 
+import humanize
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import tqdm
+from pandas import DataFrame
 
 
-def plot_all(time_dict, plot_max=True, log_scale=True):
-    titles = ["getitem", "fetch", "worker", "load_all", "benchmark_dataloader", "2-1"]
-    rows = 5
-    fig, ax = plt.subplots(rows, len(time_dict) * 2)
-    for action in range(5):
-        pos_x = action
-        for i, e in enumerate(time_dict):
-            current = time_dict[e]
-            # actions: get_item, fetch, _worker_loop,
-            _min, _max, _mean, _median = (
-                current[action].min(),
-                current[action].max(),
-                current[action].mean(),
-                current[action].median(),
+def plot_all(df: DataFrame, function_name: str, group_by: List[str], plot_max=True, log_scale=True, figsize=(50, 50)):
+    function_names = ["__getitem__", "fetch", "_worker_loop", "load_all", "benchmark_dataloader"]
+    assert function_name in function_names
+
+    df = df.groupby(group_by)
+    num_rows = len(df.groups)
+    num_cols = 4
+
+    if num_rows == 0:
+        return
+
+    fig, ax = plt.subplots(num_rows, num_cols, figsize=figsize)
+
+    for i, (key, df) in enumerate(df):
+        df_for_function_name = df[df["function_name"] == function_name]
+        elapased = df_for_function_name["elapsed"]
+        if len(elapased) == 0:
+            continue
+
+        _min, _max, _mean, _median = (
+            elapased.min(),
+            elapased.max(),
+            elapased.mean(),
+            elapased.median(),
+        )
+        labels = ["mean", "median", "min", "max"]
+        mins = _min
+        means = _mean
+        medians = _median
+        maxs = _max
+
+        x = np.arange(len(labels))
+        width = 0.2
+        pos_x = i
+        pos_y_start = 0
+        _ = ax[pos_x, pos_y_start].bar(
+            0, means, width, label=f"mean: {_mean:.2f}ms, {_mean / 60000:.2f} m", color="red"
+        )
+        _ = ax[pos_x, pos_y_start].bar(
+            1, medians, width, label=f"median: {_median:.2f}ms, {_median / 60000:.2f} m", color="green"
+        )
+        _ = ax[pos_x, pos_y_start].bar(
+            2, mins, width, label=f"min: {_min:.2f}ms, {_min / 60000:.2f} m", color="lightblue"
+        )
+        if plot_max:
+            _ = ax[pos_x, pos_y_start].bar(
+                3, maxs, width, label=f"max: {_max:.2f}ms, {_max / 60000:.2f} m", color="blue"
             )
-            labels = ["min", "max", "mean", "median"]
-            mins = _min
-            means = _mean
-            medians = _median
-            maxs = _max
 
-            x = np.arange(len(labels))
-            width = 0.2
+        ax[pos_x, pos_y_start].set_ylabel(function_name)
+        ax[pos_x, pos_y_start].set_title(key)
 
-            _ = ax[pos_x, i * 2].bar(0, means, width, label=f"mean: {_mean:.2f}ms, {_mean / 60000:.2f} m")
-            _ = ax[pos_x, i * 2].bar(1, medians, width, label=f"median: {_median:.2f}ms, {_median / 60000:.2f} m")
-            _ = ax[pos_x, i * 2].bar(2, mins, width, label=f"min: {_min:.2f}ms, {_min / 60000:.2f} m")
-            if plot_max:
-                _ = ax[pos_x, i * 2].bar(3, maxs, width, label=f"max: {_max:.2f}ms, {_max / 60000:.2f} m")
+        ax[pos_x, pos_y_start].set_xticks(x)
+        ax[pos_x, pos_y_start].set_xticklabels(labels, rotation=45, fontsize=8, ha="center")
+        ax[pos_x, pos_y_start].legend(prop={"size": 8})
+        ax[pos_x, pos_y_start].grid(which="both")
+        ax[pos_x, pos_y_start].grid(which="minor", alpha=0.5, linestyle="--")
+        if log_scale:
+            ax[pos_x, pos_y_start].set_yscale("log")
 
-            ax[pos_x, i * 2].set_ylabel(titles[action])
-            ax[pos_x, i * 2].set_title(e)
+        violin = ax[pos_x, pos_y_start + 1].violinplot(
+            elapased.tolist(),
+            vert=False,
+            widths=1.1,
+            showmeans=True,
+            showextrema=True,
+            showmedians=True,
+            quantiles=[0.25, 0.75],
+            bw_method=0.5,
+        )
+        violin["cmeans"].set_color("red")
+        violin["cmedians"].set_linewidth(2)
+        violin["cmedians"].set_color("green")
+        violin["cmaxes"].set_color("blue")
+        violin["cmaxes"].set_linestyle(":")
+        violin["cmins"].set_color("lightblue")
+        violin["cmins"].set_linestyle(":")
+        ax[pos_x, pos_y_start + 1].set_xlabel("elapsed [s]")
+        ax[pos_x, pos_y_start + 1].set_ylabel("kernel density [-]")
 
-            ax[pos_x, i * 2].set_xticks(x)
-            ax[pos_x, i * 2].set_xticklabels(labels, rotation=45, fontsize=8, ha="center")
-            ax[pos_x, i * 2].legend(prop={"size": 8})
-            ax[pos_x, i * 2].grid(which="both")
-            ax[pos_x, i * 2].grid(which="minor", alpha=0.5, linestyle="--")
-            if log_scale:
-                ax[pos_x, i * 2].set_yscale("log")
-
-            if len(current[action]) == 0:
-                continue
-            violin = ax[pos_x, i * 2 + 1].violinplot(
-                current[action].tolist(),
-                vert=False,
-                widths=1.1,
-                showmeans=True,
-                showextrema=True,
-                showmedians=True,
-                quantiles=[0.25, 0.75],
-                bw_method=0.5,
-            )
-            violin["cmeans"].set_color("r")
-            violin["cmedians"].set_linewidth(2)
-            violin["cmaxes"].set_color("grey")
-            violin["cmaxes"].set_linestyle(":")
-            violin["cmins"].set_color("grey")
-            violin["cmins"].set_linestyle(":")
-
+        df_grouped = df_for_function_name.groupby("run").agg(
+            {"time_start": "min", "time_end": "max", "len": "sum", **{k: "first" for k in group_by}}
+        )
+        df_grouped["elapsed [s]"] = df_grouped["time_end"] - df_grouped["time_start"]
+        df_grouped["throughput [Bytes/s]"] = df_grouped["len"] / df_grouped["elapsed [s]"] / 10 ** 6
+        df_grouped["throughput [Mbit/s]"] = df_grouped["len"] / df_grouped["elapsed [s]"] / 10 ** 6 * 8
+        df_grouped[["throughput [Mbit/s]"]].boxplot(ax=ax[pos_x, pos_y_start + 2])
+        df_grouped[["elapsed [s]"]].boxplot(ax=ax[pos_x, pos_y_start + 3])
     # pretty output
     fig.subplots_adjust(top=0.980, bottom=0.100, left=0.045, right=0.980, hspace=0.415, wspace=0.130)
-    # add fetch - get_item
-
-    plt.show()
 
 
-def group_by_function_name(csv_df: pd.DataFrame) -> List[pd.DataFrame]:
-    all_times = []
-    r = csv_df.query('function_name == "__getitem__"')
-    logging.info(f"Get item {len(r)}")
-    all_times.append(r.process_time)
-    r = csv_df.query('function_name == "fetch"')
-    logging.info(f"Fetch {len(r)}")
-    all_times.append(r.process_time)
-    r = csv_df.query('function_name == "_worker_loop"')
-    logging.info(f"Worker loop {len(r)}")
-    all_times.append(r.process_time)
-    r = csv_df.query('function_name == "load_all"')
-    logging.info(f"load all {len(r)}")
-    all_times.append(r.process_time)
-    r = csv_df.query('function_name == "benchmark_dataloader"')
-    logging.info(f"benchmark_dataloader {len(r)}")
-    all_times.append(r.process_time)
-    return all_times
+def get_run_stats(df: DataFrame, group_by: List[str], row_filter: Dict[str, List[str]] = None):
+    if row_filter is not None:
+        for col, items in row_filter.items():
+            df = df.filter(index=col, items=items, axis=0)
+    df = df.groupby(group_by + ["run"]).agg(
+        **{"downloaded data [B]": ("len", "sum"), "time_start": ("time_start", "min"), "time_end": ("time_end", "max"),}
+    )
+    df["total_elpased_time [s]"] = df["time_end"] - df["time_start"]
+    df["downloaded data [MB]"] = df["downloaded data [B]"] / 10 ** 6
+    df["throughput [MBit/s]"] = df["downloaded data [MB]"] * 8 / df["total_elpased_time [s]"]
+
+    return df
+
+
+def get_throughputs(df: DataFrame, group_by: List[str], row_filter: Dict[str, List[str]] = None):
+    df = get_run_stats(df, group_by=group_by, row_filter=row_filter)
+    df = df.groupby(group_by).agg(
+        **{
+            "total_elpased_time [s]": ("total_elpased_time [s]", "sum"),
+            "downloaded data [MB]": ("downloaded data [MB]", "sum"),
+            "med. throughput [MBit/s]": ("throughput [MBit/s]", "median"),
+            "avg. throughput [MBit/s]": ("throughput [MBit/s]", "mean"),
+            "min. throughput [MBit/s]": ("throughput [MBit/s]", "min"),
+            "max. throughput [MBit/s]": ("throughput [MBit/s]", "max"),
+        }
+    )
+    df["throughput [MBit/s]"] = df["downloaded data [MB]"] * 8 / df["total_elpased_time [s]"]
+    return df
+
+
+def get_thread_stats(df: DataFrame, group_by: List[str]):
+    s = (
+        df[df["trace_level"] == 5]
+        .groupby("threading_ident")
+        .agg(
+            **{
+                "time_start_thread": ("time_start", "min"),
+                "time_end_thread": ("time_end", "max"),
+                "total_elapsed_thread": ("elapsed", sum),
+                **{k: (k, "first") for k in group_by},
+            }
+        )
+    )
+    s["elapsed_thread"] = s["time_end_thread"] - s["time_start_thread"]
+    s["elapsed_processing"] = s["total_elapsed_thread"] / s["elapsed_thread"]
+    return s
+
+
+# https://stackoverflow.com/questions/37765197/darken-or-lighten-a-color-in-matplotlib
+def lighten_color(color, amount=0.5):
+    """Lightens the given color by multiplying (1-luminosity) by the given
+    amount. Input can be matplotlib color string, hex string, or RGB tuple.
+
+    Examples:
+    >> lighten_color('g', 0.3)
+    >> lighten_color('#F034A3', 0.6)
+    >> lighten_color((.3,.55,.1), 0.5)
+    """
+    import matplotlib.colors as mc
+    import colorsys
+
+    try:
+        c = mc.cnames[color]
+    except:  # noqa
+        c = color
+    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+    return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])
+
+
+def plot_throughput_per_storage(df, group_by: List[str]):
+    collected = {}
+
+    x_label = group_by[1]
+
+    df_for_function_name = df[df["function_name"] == "__getitem__"]
+    df_for_function_name["request_time"] = df_for_function_name["time_end"] - df_for_function_name["time_start"]
+    nodes = set(df_for_function_name["node"].drop_duplicates().tolist())
+    df_grouped_by_run = df_for_function_name.groupby(["run"]).agg(
+        {"time_start": "min", "time_end": "max", "len": "sum", **{k: "first" for k in group_by}}
+    )
+    df_grouped_by_run["runtime"] = df_grouped_by_run["time_end"] - df_grouped_by_run["time_start"]
+    df_grouped_by_run["throughput [Mbit/s]"] = df_grouped_by_run["len"] / df_grouped_by_run["runtime"] / 10 ** 6 * 8
+
+    # sum of all runtimes and all downloaded data by summer over runs
+    df_aggregated_over_runs = df_grouped_by_run.groupby(group_by).agg(
+        **{
+            "len": ("len", "sum"),
+            "runtime": ("runtime", "sum"),
+            "min_throughput": ("throughput [Mbit/s]", "min"),
+            "max_throughput": ("throughput [Mbit/s]", "max"),
+            **{k: (k, "first") for k in group_by},
+        }
+    )
+
+    # https://en.wikipedia.org/wiki/Data-rate_units#Megabit_per_second
+    df_aggregated_over_runs["throughput [Mbit/s]"] = (
+        df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / 10 ** 6 * 8
+    )
+    df_aggregated_over_runs["min_throughput"] = df_aggregated_over_runs["min_throughput"]
+
+    # all requests from all data
+    df_aggregated_over_requests = df_for_function_name.groupby(group_by).agg(
+        **{
+            "min_request_time": ("request_time", "min"),
+            "max_request_time": ("request_time", "max"),
+            "median_request_time": ("request_time", "median"),
+            "mean_request_time": ("request_time", "mean"),
+            **{k: (k, "first") for k in group_by},
+        }
+    )
+
+    fig, ax1 = plt.subplots(figsize=(50, 10))
+    ax1.set_ylim([0, min(2000, df_grouped_by_run["throughput [Mbit/s]"].max())])
+    ax2 = ax1.twinx()
+    cmap = plt.cm.get_cmap("Set1")
+
+    # TODO loop over groups instead
+    for i, dataset in enumerate(["s3", "scratch"]):
+        df = df_aggregated_over_runs[df_aggregated_over_runs["dataset"] == dataset]
+
+        storage = dataset
+
+        ax1.plot(
+            df[x_label],
+            df["throughput [Mbit/s]"],
+            linewidth=4,
+            color=cmap(i),
+            label=f"{storage} throughput over all runs, min/max hull per run",
+        )
+        ax1.fill_between(
+            df[x_label], df["min_throughput"], df["max_throughput"], color=lighten_color(cmap(i), 0.2), alpha=0.5
+        )
+        ax1.set_xticks(df[x_label])
+
+        df2 = df_aggregated_over_requests[df_aggregated_over_requests["dataset"] == dataset]
+        ax2.plot(
+            df2[x_label],
+            df2["median_request_time"],
+            linewidth=4,
+            color=cmap(i),
+            label=f"{storage} request_time",
+            linestyle="dashed",
+        )
+
+    fig.legend(handlelength=5)
+
+    ax1.set_ylabel("throughput [Mbit/s]")
+    ax1.set_xlabel(f"{x_label} [#processes]")
+    ax1.set_title(f"Storage benchmarking {nodes} {list(collected.keys())}")
+    ax2.set_ylabel("Request time [s]")
+
+
+def plot_events_timeline(df_dataloader, color_column: str = "threading_ident", cycle=11):
+    df_dataloader = df_dataloader.sort_values(
+        ["pid", "trace_level", "threading_ident", "time_start"], ascending=[False, False, False, False]
+    ).reset_index(drop=True)
+
+    total_elapsed = df_dataloader["time_end"].max() - df_dataloader["time_start"].min()
+    total_bytes = df_dataloader["len"].sum()
+    print(f"total_elapsed={timedelta(seconds=total_elapsed)}")
+    print(f"total_bytes={humanize.naturalsize(total_bytes)}")
+    print(f"overall rate {humanize.naturalsize(total_bytes / total_elapsed)}/s")
+    print(f"overall rate {humanize.naturalsize(total_bytes / total_elapsed * 8)}it/s")
+
+    dict_dataloader = df_dataloader.to_dict("index")
+    threading_idents = {d[color_column] for d in dict_dataloader.values()}
+
+    cmap = plt.cm.get_cmap("hsv", cycle)
+    all_colors = [cmap(i) for i in range(cycle)]
+
+    threading_ident_cmap = {
+        threading_ident: all_colors[i % cycle] for i, threading_ident in enumerate(threading_idents)
+    }
+    lines = [[(d["time_start"], i), (d["time_end"], i)] for i, (k, d) in enumerate(dict_dataloader.items())]
+    c = [threading_ident_cmap[d[color_column]] for d in dict_dataloader.values()]
+
+    lc = matplotlib.collections.LineCollection(lines, colors=c, linewidths=2)
+    fig, ax = plt.subplots(figsize=(50, 50))
+    ax.add_collection(lc)
+    ax.autoscale()
+    ax.margins(0.1)
 
 
 def parse_results_log(working_file_path: str) -> List[Dict]:
@@ -113,36 +304,36 @@ def parse_results_log(working_file_path: str) -> List[Dict]:
     return data
 
 
-def handle_arguments() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output_base_folder", type=Path, default=Path("/iarai/work/logs/storage_benchmarking"))
-    return parser
-
-
-def main(*args):
-    parser = handle_arguments()
-    args = parser.parse_args(args)
-    # TODO make configurable in cli,
-    # TODO read metadata as well
-    # TODO filter on metadata as well
-    files = args.output_base_folder.rglob("**/results-*.log")
-    data_grouped_by_dir = {}
-    for working_file_path in files:
+def extract_pandas(
+    output_base_folder: Path, folder_filter: str = "**", filter_by_metadata: Dict[str, List[str]] = None,
+):
+    files = list(output_base_folder.rglob(f"{folder_filter}/results-*.log"))
+    data = []
+    for working_file_path in tqdm.tqdm(files, total=len(files)):
         results = parse_results_log(working_file_path)
-        with (working_file_path.parent / "metadata.json").open("r") as f:
-            metadata = json.load(f)  # noqa
-        # TODO refine grouping
-        key = "_".join(working_file_path.parent.name.split("_")[1:])
         if len(results) == 0:
             continue
-        data_grouped_by_dir.setdefault(key, []).extend(results)
-    time_dict = {}
+        with (working_file_path.parent / "metadata.json").open("r") as f:
+            metadata = json.load(f)
+        if filter_by_metadata is not None:
+            for k, v in filter_by_metadata.items():
+                if metadata[k] not in v:
+                    continue
+        results = pd.DataFrame.from_records(data=results)
 
-    for dir, data in data_grouped_by_dir.items():
-        time_dict[dir] = group_by_function_name(pd.DataFrame.from_records(data=data))
+        for k, v in metadata.items():
+            results[k] = v
+            if not isinstance(v, (int, float, complex)):
+                results[k] = str(v)
 
-    plot_all(time_dict, plot_max=True, log_scale=True)
+        results["source_file"] = working_file_path
+        results["run"] = working_file_path.parent.name
 
+        # filter out old data format missing dataset etc.
+        if "dataset" not in results.columns:
+            continue
 
-if __name__ == "__main__":
-    main(*sys.argv[1:])
+        data.append(results)
+    df = pd.concat(data)
+    df.groupby
+    return df

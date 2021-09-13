@@ -82,19 +82,20 @@ class S3Dataset(IndexedDataset):
     @overrides
     def get_random_item(self) -> Image:
         self.lazy_init()
-        rn = self.rng.get_int(0, self.__len__())
+        rn = self.rng.get_int(0, self.__len__() - 1)
         return self.__getitem__(rn)
 
     # TODO we should do the do the @stopwatch instrumentalization only in the benchmarking part
     #  and keep this code clean from those aspects!
     # TODO #32 make this agnostic to Image or whatever
-    @stopwatch("(5)-get_item")
+    @stopwatch(trace_name="(5)-get_item", trace_level=5, strip_result=True)
     def __getitem__(self, index: int, **kwargs) -> Image:
         self.lazy_init()
         b = BytesIO()
         self.s3_bucket.download_fileobj(self.image_paths[index], b)
+
         image = Image.open(b)
-        return self.transform(image)
+        return self.transform(image), b.getbuffer().nbytes
 
     def __len__(self):
         if self.limit is None:

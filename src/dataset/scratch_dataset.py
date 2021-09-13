@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -33,11 +34,11 @@ class ScratchDataset(IndexedDataset):
     # TODO we should do the do the @stopwatch instrumentalization only in the benchmarking part and
     #  keep this code clean from those aspects! Decorator for decorator...?
     # TODO we should make this code independent of the underlying dataset, not necessarily images/imagenet?
-    @stopwatch("(5)-get_item")
+    @stopwatch(trace_name="(5)-get_item", trace_level=5, strip_result=True)
     def __getitem__(self, index) -> Image:
         image_path = self.image_paths[index]
         image = Image.open(image_path)
-        return self.transform(image)
+        return self.transform(image), os.path.getsize(image_path)
 
     def __len__(self) -> int:
         if self.limit is None:

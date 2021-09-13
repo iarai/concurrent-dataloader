@@ -1,5 +1,4 @@
 import argparse
-import json
 import logging
 import sys
 from pathlib import Path
@@ -7,49 +6,29 @@ from pathlib import Path
 from action_player.action_player import ActionPlayer
 from action_player.mp_action_player import MPActionPlayer
 from dataset.indexed_dataset import IndexedDataset
-from dataset.s3_dataset import S3Dataset
-from dataset.scratch_dataset import ScratchDataset
-from dataset.t4c_s3_dataset import HDF5S3MODE
-from dataset.t4c_s3_dataset import T4CDataset
+from main import get_dataset
 from main import init_benchmarking
-
-
-# main function that defines the testing order ... e.g. index, load, save
 
 
 def benchmark_dataset(
     dataset: IndexedDataset,
     output_base_folder: Path,
-    skip_indexing: bool = True,
-    mp: bool = False,
     pool_size: int = 5,
+    num_index_all=0,
     num_load_index=5,
     num_get_random_item=10000,
 ) -> None:
-    # TODO once we have all options from cli, we may get rid of this
-    with (output_base_folder / "benchmark_dataset.json").open("w") as f:
-        json.dump(
-            {
-                # TODO log params as well
-                "dataset": str(dataset),
-                "mp": mp,
-                "pool_size": pool_size,
-                "num_load_index": num_load_index,
-                "num_get_random_item": num_get_random_item,
-            },
-            f,
-        )
-    if not mp:
+    if pool_size == 0:
         action_player = ActionPlayer()
     else:
-        assert skip_indexing, "Indexing cannot be performed by Multi-Processing ActionPlayer"
+        assert num_index_all == 0, "Indexing cannot be performed by Multi-Processing ActionPlayer"
         action_player = MPActionPlayer(pool_size=pool_size)
 
     # ls (index) all images
-    if not skip_indexing:
-        logging.info("Indexing")
-        # TODO use param
-        action_player.benchmark("indexing", dataset.index_all, 5)
+    logging.info("Indexing")
+    action_player.benchmark(
+        "indexing", action=dataset.index_all, repeat=num_index_all, output_base_folder=output_base_folder
+    )
 
     # load random images
     action_player.benchmark(
@@ -74,68 +53,66 @@ def benchmark_dataset(
 
 def handle_arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-a",
-        "--action",
-        help="An option to benchmark (s3, scratch, random_gpu, random_to_gpu, random_image)",
-        default="random_gpu",
-    )
     parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
-    parser.add_argument("-args", "--args", nargs="+", help="Additional arguments")
+    parser.add_argument(
+        "--dataset", help="An option to benchmark (s3, scratch,)", default="s3",
+    )
+    parser.add_argument(
+        "--num_get_random_item",
+        type=int,
+        help="An option to benchmark (s3, scratch, random_gpu, random_to_gpu, random_image)",
+        default=55,
+    )
+    parser.add_argument(
+        "--num_load_index",
+        type=int,
+        help="An option to benchmark (s3, scratch, random_gpu, random_to_gpu, random_image)",
+        default=0,
+    )
+    parser.add_argument(
+        "--num_index_all",
+        type=int,
+        help="An option to benchmark (s3, scratch, random_gpu, random_to_gpu, random_image)",
+        default=0,
+    )
+    parser.add_argument(
+        "--pool_size",
+        type=int,
+        help="An option to benchmark (s3, scratch, random_gpu, random_to_gpu, random_image)",
+        default=5,
+    )
+    parser.add_argument("--args", nargs="+", help="Additional arguments")
+    parser.add_argument("--loglevel", default="INFO", help="Additional arguments")
     return parser
 
 
 def main(*args):
     parser = handle_arguments()
     args = parser.parse_args(args)
-    output_base_folder = init_benchmarking(args, action="_".join(["benchmark_dataset", args.action]))
+    dataset = args.dataset
+    output_base_folder = init_benchmarking(
+        args, action="_".join(["benchmark_dataset", dataset]), loglevel=args.loglevel
+    )
+    logging.info("==================== benchmark_dataset %s ==========================================", vars(args))
+    benchmark_args = vars(args).copy()
+    benchmark_args.pop("dataset")
+    benchmark_args.pop("args")
+    benchmark_args.pop("loglevel")
+    benchmark_args["output_base_folder"] = output_base_folder
 
     # -------------------------------------
     # benchmark_dataset
     # -------------------------------------
-    if args.action == "t4c":
-        benchmark_dataset(
-            # TODO magic constants... extract to cli... how to do in a generic way...
-            dataset=T4CDataset(
-                **json.load(open("s3_iarai_playground_t4c21.json")),
-                index_file=Path("index-t4c.json"),
-                mode=HDF5S3MODE[args.args[0]],
-            ),
-            skip_indexing=True,
-            mp=True,
-            # TODO magic constants... extract to cli... how to do in a generic way...
-            num_load_index=0,
-            num_get_random_item=5,
-            pool_size=5,
-            output_base_folder=output_base_folder,
-        )
 
-    elif args.action == "s3":
-        benchmark_dataset(
-            S3Dataset(
-                # TODO magic constants... extract to cli... how to do in a generic way...
-                **json.load(open("s3_iarai_playground_imagenet.json")),
-                index_file=Path("index-s3-val.json"),
-            ),
-            skip_indexing=True,
-            mp=False,
-            output_base_folder=output_base_folder,
-            num_load_index=0,
-            num_get_random_item=55,
-        )
-    elif args.action == "scratch":
-        benchmark_dataset(
-            # TODO magic constants... extract to cli... how to do in a generic way...
-            dataset=ScratchDataset(index_file=Path("index-scratch-val.json")),
-            output_base_folder=output_base_folder,
-            mp=True,
-            pool_size=4,
-            num_load_index=0,
-            num_get_random_item=55,
-        )
-    else:
+    additional_args = args.args
+    dataset = get_dataset(dataset=dataset, additional_args=additional_args)
+    if dataset is None:
         parser.print_help()
         exit(2)
+
+    benchmark_dataset(
+        dataset=dataset, **benchmark_args,
+    )
 
 
 if __name__ == "__main__":
