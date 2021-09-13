@@ -156,7 +156,7 @@ class T4CDataset(S3Dataset):
             return min(size_240_slots_a_day, self.limit)
         return size_240_slots_a_day
 
-    @stopwatch("(5)-get_item")
+    @stopwatch(trace_name="(5)-get_item", trace_level=5)
     def __getitem__(self, idx: int) -> Tuple[Any, Any]:
         if idx > self.__len__():
             raise IndexError("Index out of bounds")

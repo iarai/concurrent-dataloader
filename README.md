@@ -28,7 +28,12 @@ python benchmark/benchmark_tensor_loading.py -a mp
 
 
 vi s3_iarai_playground_imagenet.json # see below
-python benchmark/benchmark_dataset.py -a s3
+
+
+python -m benchmark.benchmark_dataset --output_base_folder ~/workspaces/storage-benchmarking/benchmark_output -a s3 --num_get_random_item 2000 --pool_size 20
+python -m benchmark.benchmark_dataset --output_base_folder ~/workspaces/storage-benchmarking/benchmark_output -a s3 --num_get_random_item 2000 --pool_size 5
+python -m benchmark.benchmark_dataset --output_base_folder ~/workspaces/storage-benchmarking/benchmark_output -a s3 --num_get_random_item 2000 --pool_size 0
+
 python -c 'from dataset.scratch_dataset import ScratchDataset; from pathlib import Path; ScratchDataset.index_all(Path("/scratch/imagenet/val"), "index-scratch-val.json")'
 python benchmark/benchmark_dataset.py -a scratch
 
@@ -41,10 +46,6 @@ python benchmark/benchmark_dataloader.py
 ```
 
 
-## sync tu -> gluster
-```
-rsync -Wuva ~/workspaces/storage-benchmarking/src/benchmark_output/ christian.eichenberger@lnx-slim-1.lan.iarai.ac.at:/iarai/work/logs/storage_benchmarking/
-```
 
 
 
@@ -107,8 +108,19 @@ s3_dataset = S3Dataset.index_all(
 `pre-commit run --all`
 
 
+
+
+## sync tu -> gluster
+```
+rsync -Wuva ~/workspaces/storage-benchmarking/benchmark_output/ christian.eichenberger@lnx-slim-1.lan.iarai.ac.at:/iarai/work/logs/storage_benchmarking/
+```
+
 ## Analysis
 ```
 sshfs christian.eichenberger@lnx-slim-1.lan.iarai.ac.at:/iarai /iarai
-python analysis/analyze_results.py --output_base_folder /iarai/work/logs/storage_benchmarking
+
+cd src
+export PYTHONPATH=$PWD
+jupyter notebook analysis/Analysis.ipynb
+
 ```

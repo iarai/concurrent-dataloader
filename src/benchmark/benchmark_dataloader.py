@@ -1,15 +1,16 @@
 import argparse
-import json
 import logging
 import sys
 from functools import partial
 from pathlib import Path
 from typing import List
+from typing import Optional
 
 import torch
 from action_player.action_player import ActionPlayer
 from data_loader.async_data_loader import AsynchronousLoader
-from dataset.s3_dataset import S3Dataset
+from dataset.indexed_dataset import IndexedDataset
+from main import get_dataset
 from main import init_benchmarking
 from misc.logging_configuration import initialize_logging
 from misc.time_helper import stopwatch
@@ -18,19 +19,12 @@ from torch_overrides.dataloader import DataLoader
 from torch_overrides.worker import _worker_loop
 
 
-@stopwatch("(2)-load_single")
-def load_single(dataloader: DataLoader) -> None:
+@stopwatch(trace_name="(2)-load_all", trace_level=2)
+def load_all(dataloader: DataLoader, num_batches: Optional[int] = None) -> None:
     try:
-        _ = next(iter(dataloader))
-    except (StopIteration, EOFError) as e:
-        logging.info(f"Exception raised: {str(e)}")
-
-
-@stopwatch("(2)-load_all")
-def load_all(dataloader: DataLoader) -> None:
-    try:
-        # loading the data, replace with i, batch -> logging.info(f"{len(batch)}, {i}, {len(dataloader)}")
-        for _, _ in enumerate(dataloader):
+        for i, _ in enumerate(dataloader):
+            if i == num_batches - 1:
+                break
             pass
     except (StopIteration, EOFError) as e:
         logging.info(f"Exception raised : {e}")
@@ -43,51 +37,30 @@ def collate(batch: List) -> Tensor:
     return imgs
 
 
-@stopwatch("(1)-benchmark")
+@stopwatch(trace_name="(1)-benchmark", trace_level=1)
 def benchmark_dataloader(
+    dataset: IndexedDataset,
     batch_size: int,
     num_workers: int,
     data_loader_type: str,
     output_base_folder: Path,
-    warmup_repeat=3,
     repeat: int = 10,
     prefetch_factor=2,
     num_fetch_workers=4,
-    limit=50,
     device: str = "cuda",
+    shuffle: bool = False,
+    num_batches: Optional[int] = None,
 ) -> None:
     action_player = ActionPlayer()
 
-    # TODO once we have all options from cli, we may get rid of this
-    with (output_base_folder / "benchmark_dataloader.json").open("w") as f:
-        json.dump(
-            {
-                "batch_size": batch_size,
-                "num_workers": num_workers,
-                "data_loader_type": data_loader_type,
-                "repeat": repeat,
-                "prefetch_factor": prefetch_factor,
-                "num_fetch_workers": num_fetch_workers,
-                "limit": limit,
-                "device": device,
-            },
-            f,
-        )
-
-    _dataset = S3Dataset(
-        # TODO magic constants
-        **json.load(open("s3_iarai_playground_imagenet.json")),
-        index_file=Path("index-s3-val.json"),
-        limit=limit,
-    )
-    _dataset.load_index()
+    dataset.load_index()
 
     if data_loader_type == "async":
         data_loader = AsynchronousLoader(
-            data=_dataset,
+            data=dataset,
             batch_size=batch_size,
             num_workers=num_workers,
-            shuffle=False,
+            shuffle=shuffle,
             device=device,
             collate_fn=collate,
             prefetch_factor=prefetch_factor,
@@ -95,10 +68,10 @@ def benchmark_dataloader(
         )
     else:
         data_loader = DataLoader(
-            dataset=_dataset,
+            dataset=dataset,
             batch_size=batch_size,
             num_workers=num_workers,
-            shuffle=False,
+            shuffle=shuffle,
             collate_fn=collate,
             prefetch_factor=prefetch_factor,
             num_fetch_workers=num_fetch_workers,
@@ -106,17 +79,6 @@ def benchmark_dataloader(
 
     # TODO should we do this in a central place?
     # override the _worker_loop to inject @stopwatch
-    # warmup without logging
-    torch.utils.data._utils.worker._worker_loop = _worker_loop
-
-    # TODO skip logging during warmup?
-    logging.info(f"Warmup ... batch {batch_size}, workers {num_workers}")
-    action_player.benchmark(
-        "loading_with_dataloader_warmup", lambda: load_single(data_loader), repeat=warmup_repeat,
-    )
-    logging.info("Warmup -- end")
-
-    # now with logging
     torch.utils.data._utils.worker._worker_loop = partial(
         _worker_loop,
         initializer=partial(
@@ -124,18 +86,25 @@ def benchmark_dataloader(
         ),
     )
     # real benchmark
-    action_player.benchmark("loading_with_dataloader", lambda: load_all(data_loader), repeat=repeat)
+    action_player.benchmark(
+        "loading_with_dataloader", lambda: load_all(data_loader, num_batches=num_batches), repeat=repeat
+    )
 
 
 def handle_arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
+    parser.add_argument("--dataset", type=str, default="s3")
     parser.add_argument("--batch_size", type=int, default=50, help="Additional arguments")
     parser.add_argument("--num_workers", type=int, default=2, help="Additional arguments")
-    parser.add_argument("--data_loader_type", type=str, default="sync", help="Additional arguments")
+    parser.add_argument(
+        "--data_loader_type", type=str, default="sync", help="sync/async, async is CUDA stream processing"
+    )
     parser.add_argument("--num_fetch_workers", type=int, default=1, help="Additional arguments")
+    parser.add_argument("--prefetch_factor", type=int, default=2, help="Additional arguments")
     parser.add_argument("--repeat", type=int, default=10, help="Additional arguments")
-    parser.add_argument("--limit", type=int, default=20, help="Additional arguments")
+    parser.add_argument("--num_batches", type=int, default=None, help="None means full dataset")
+    parser.add_argument("--shuffle", type=bool, default=True, help="Additional arguments")
     return parser
 
 
@@ -145,13 +114,26 @@ def main(*args):
 
     output_base_folder = init_benchmarking(
         args=args,
-        action="_".join(["benchmark_dataloader", str(args.batch_size), str(args.num_workers), args.data_loader_type]),
+        action="_".join(
+            [
+                "benchmark_dataloader",
+                str(args.dataset),
+                str(args.batch_size),
+                str(args.num_workers),
+                str(args.num_fetch_workers),
+                args.data_loader_type,
+            ]
+        ),
     )
     args = vars(args)
     args["output_base_folder"] = output_base_folder
-
+    args["dataset"] = get_dataset(dataset=args["dataset"], additional_args=[])
     benchmark_dataloader(**args)
 
 
 if __name__ == "__main__":
     main(*sys.argv[1:])
+
+
+# TODO with num_workers > 0, why do the logs of the workers go into the main processes log?
+#  Is this PyTorch doing something?

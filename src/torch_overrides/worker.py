@@ -215,7 +215,7 @@ def _generate_state(base_seed, worker_id):
     return state
 
 
-@stopwatch("(3)-worker_loop")
+@stopwatch(trace_name="(3)-worker_loop", trace_level=3)
 def _worker_loop(
     dataset_kind,
     dataset,

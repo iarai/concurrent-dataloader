@@ -47,7 +47,7 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):
         super(_MapDatasetFetcher, self).__init__(dataset, auto_collation, collate_fn, drop_last)
 
-    @stopwatch("(4)-mapdataset-fetcher")
+    @stopwatch(trace_name="(4)-mapdataset-fetcher", trace_level=4)
     def fetch(self, possibly_batched_index):
         # print("Overriden... {possibly_batched_index}")
         if self.auto_collation:
@@ -112,7 +112,7 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
         # sort wrt index
         return result_list.sort(key=lambda v: v[0])
 
-    @stopwatch("(4)-threadedmapdataset-fetcher")
+    @stopwatch(trace_name="(4)-threadedmapdataset-fetcher", trace_level=4)
     def fetch(self, batch_indices: List[int]) -> List[torch.Tensor]:
         """Entrypoint function to async execution. It calls the async function
         initiate_fetch_tasks that uses batch indices to create a list of tasks
