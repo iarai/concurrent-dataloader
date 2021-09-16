@@ -23,7 +23,7 @@ from torch_overrides.worker import _worker_loop
 def load_all(dataloader: DataLoader, num_batches: Optional[int] = None) -> None:
     try:
         for i, _ in enumerate(dataloader):
-            if i == num_batches - 1:
+            if num_batches is not None and i == num_batches - 1:
                 break
             pass
     except (StopIteration, EOFError) as e:
@@ -50,6 +50,7 @@ def benchmark_dataloader(
     device: str = "cuda",
     shuffle: bool = False,
     num_batches: Optional[int] = None,
+    fetch_impl: Optional[str] = None,
 ) -> None:
     action_player = ActionPlayer()
 
@@ -105,6 +106,7 @@ def handle_arguments() -> argparse.ArgumentParser:
     parser.add_argument("--repeat", type=int, default=1, help="Additional arguments")
     parser.add_argument("--num_batches", type=int, default=None, help="None means full dataset")
     parser.add_argument("--shuffle", type=bool, default=True, help="Additional arguments")
+    parser.add_argument("--fetch_impl", type=str, default="acyncio", help="threaded or acyncio")
     return parser
 
 

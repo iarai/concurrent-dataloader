@@ -32,7 +32,7 @@ from torch.utils.data import Sampler
 from torch.utils.data import SequentialSampler
 from torch_overrides.fetch import _IterableDatasetFetcher
 from torch_overrides.fetch import _MapDatasetFetcher
-from torch_overrides.fetch import _ThreadedMapDatasetFetcher
+from torch_overrides.fetch import _ThreadedMapDatasetFetcher, _AsyncMapDatasetFetcher
 from torch_overrides.worker import get_worker_info
 
 T_co = TypeVar("T_co", covariant=True)
@@ -60,10 +60,12 @@ class _DatasetKind(object):
     Iterable = 1
 
     @staticmethod
-    def create_fetcher(kind, dataset, auto_collation, collate_fn, drop_last, num_fetch_workers=1):
+    def create_fetcher(kind, dataset, auto_collation, collate_fn, drop_last, fetch_impl, num_fetch_workers=1):
         if kind == _DatasetKind.Map:
-            return _ThreadedMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
-            # return _MapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last)
+            if fetch_impl == "asyncio":
+                return _AsyncMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
+            else:
+                return _ThreadedMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
         else:
             return _IterableDatasetFetcher(dataset, auto_collation, collate_fn, drop_last)
 
@@ -195,9 +197,11 @@ class DataLoader(Generic[T_co]):
         persistent_workers: bool = False,
         num_fetch_workers: int = 1,
         batch_pool: int = 10,
+        fetch_impl: str = "threaded"
     ):
         self.num_fetch_workers = num_fetch_workers
         self.batch_pool = batch_pool
+        self.fetch_impl = fetch_impl
         torch._C._log_api_usage_once("python.data_loader")
 
         if num_workers < 0:
@@ -615,6 +619,7 @@ class _SingleProcessDataLoaderIter(_BaseDataLoaderIter):
             self._auto_collation,
             self._collate_fn,
             self._drop_last,
+            loader.fetch_impl,
             loader.num_fetch_workers,
         )
 
@@ -979,8 +984,9 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                     i,
                     self._num_workers,
                     self._persistent_workers,
+                    loader.fetch_impl,
                     loader.num_fetch_workers,
-                    self.batch_pool,
+                    loader.batch_pool,
                 ),
             )
             w.daemon = True
