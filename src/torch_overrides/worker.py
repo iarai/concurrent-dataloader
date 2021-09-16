@@ -336,9 +336,7 @@ def _worker_loop(
                                 for index in batch_indices:
                                     batches[index] = batch_id
 
-                        for batch, batch_id in fetcher.yield_batch(
-                            items=batches, items_flat=list(batches.keys()), batch_sizes=batch_sizes
-                        ):
+                        for batch, batch_id in fetcher.yield_batch(items=batches, batch_sizes=batch_sizes):
                             batch.sort(key=lambda index: index["item_id"])
                             # print(f"Got batch {batch_id} ({len(batch)})")
                             b = [b["tensor"] for b in batch]

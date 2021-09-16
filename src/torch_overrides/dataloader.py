@@ -30,9 +30,10 @@ from torch.utils.data import IterableDataset
 from torch.utils.data import RandomSampler
 from torch.utils.data import Sampler
 from torch.utils.data import SequentialSampler
+from torch_overrides.fetch import _AsyncMapDatasetFetcher
 from torch_overrides.fetch import _IterableDatasetFetcher
 from torch_overrides.fetch import _MapDatasetFetcher
-from torch_overrides.fetch import _ThreadedMapDatasetFetcher, _AsyncMapDatasetFetcher
+from torch_overrides.fetch import _ThreadedMapDatasetFetcher
 from torch_overrides.worker import get_worker_info
 
 T_co = TypeVar("T_co", covariant=True)

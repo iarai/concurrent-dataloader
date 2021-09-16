@@ -2,15 +2,16 @@ r""""Contains definitions of the methods used by the _BaseDataLoaderIter to fetc
 data from an iterable-style or map-style dataset. This logic is shared in both
 single- and multi-processing data loading.
 """
-import concurrent
 import asyncio
+import concurrent
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, List
+from typing import Callable
+from typing import List
 
 from misc.time_helper import stopwatch
-from torch.utils.data import Dataset
 from torch import Tensor
+from torch.utils.data import Dataset
 
 
 class _BaseDatasetFetcher(object):
@@ -60,8 +61,7 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
 
 class _AsyncMapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(
-            self, dataset: Dataset, auto_collation: bool, collate_fn: Callable, drop_last: bool,
-            num_fetch_workers: int = 1
+        self, dataset: Dataset, auto_collation: bool, collate_fn: Callable, drop_last: bool, num_fetch_workers: int = 1
     ):
         super(_AsyncMapDatasetFetcher, self).__init__(dataset, auto_collation, collate_fn, drop_last)
         # Initialize a thread pool
@@ -136,8 +136,7 @@ class _AsyncMapDatasetFetcher(_BaseDatasetFetcher):
 
 class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(
-            self, dataset: Dataset, auto_collation: bool, collate_fn: Callable, drop_last: bool,
-            num_fetch_workers: int = 1
+        self, dataset: Dataset, auto_collation: bool, collate_fn: Callable, drop_last: bool, num_fetch_workers: int = 1
     ):
         super(_ThreadedMapDatasetFetcher, self).__init__(dataset, auto_collation, collate_fn, drop_last)
         # Initialize a thread pool
@@ -145,8 +144,7 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
         self.items_flat = None
 
     def fetch_item(self, item: int, index: int) -> dict:
-        """
-        Uses the dataset __getitem__ function to fetch a single data item.
+        """Uses the dataset __getitem__ function to fetch a single data item.
 
         Arguments
             - item, data item id (not to be confused with index)
@@ -156,15 +154,14 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
                 - tensor, resulting item (not necessarily a tensor)
                 - index, item's position in the batch
                 - item_id, item identifier (=input argument item) for book keeping
-
         """
         result = self.dataset.__getitem__(item)
         return {"tensor": self.collate_fn(result), "index": index, "item_id": item}
 
     def yield_item(self) -> dict:
-        """
-        Uses a ThreadPoolExecutor and creates a list of futures, i.e. tasks. Each task returns a single data item, and
-        as the results come in, they are yielded.
+        """Uses a ThreadPoolExecutor and creates a list of futures, i.e. tasks.
+        Each task returns a single data item, and as the results come in, they
+        are yielded.
 
         Returns:
             - a dictionary with tensor, data item id, and it's index in the batch
@@ -183,20 +180,15 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
                     print(f"Exception in fetcher: {str(exc)}")
 
     @stopwatch(trace_name="(4)-threadedmapdataset-fetcher", trace_level=4)
-    def yield_batch(self, items, items_flat, batch_sizes):
-        """
+    def yield_batch(self, items, batch_sizes) -> dict:
+        """Arguments.
 
-        Parameters
-        ----------
-        items
-        items_flat
-        batch_sizes
-
+            - items, indices of  all items in the batch
+            - batch_sizes, size of each batch
         Returns
-        -------
-
+            - complete batch, as dictionary with items, batch indexes and item_ids
         """
-        self.items_flat = items_flat
+        self.items_flat = list(items.keys())
         collected_batches = defaultdict(list)
         for r in self.yield_item():
             collected_batches[items[r["index"]]].append(r)

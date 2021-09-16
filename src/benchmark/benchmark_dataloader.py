@@ -51,6 +51,7 @@ def benchmark_dataloader(
     shuffle: bool = False,
     num_batches: Optional[int] = None,
     fetch_impl: Optional[str] = None,
+    batch_pool: Optional[int] = None,
 ) -> None:
     action_player = ActionPlayer()
 
@@ -66,6 +67,8 @@ def benchmark_dataloader(
             collate_fn=collate,
             prefetch_factor=prefetch_factor,
             num_fetch_workers=num_fetch_workers,
+            fetch_impl=fetch_impl,
+            batch_pool=batch_pool,
         )
     else:
         data_loader = DataLoader(
@@ -76,6 +79,8 @@ def benchmark_dataloader(
             collate_fn=collate,
             prefetch_factor=prefetch_factor,
             num_fetch_workers=num_fetch_workers,
+            fetch_impl=fetch_impl,
+            batch_pool=batch_pool,
         )
 
     # TODO should we do this in a central place?
@@ -99,14 +104,15 @@ def handle_arguments() -> argparse.ArgumentParser:
     parser.add_argument("--batch_size", type=int, default=50, help="Additional arguments")
     parser.add_argument("--num_workers", type=int, default=1, help="Additional arguments")
     parser.add_argument(
-        "--data_loader_type", type=str, default="sync", help="sync/async, async is CUDA stream processing"
+        "--data_loader_type", type=str, default="sync", help="sync/async, " "async is CUDA stream processing"
     )
     parser.add_argument("--num_fetch_workers", type=int, default=16, help="Additional arguments")
     parser.add_argument("--prefetch_factor", type=int, default=2, help="Additional arguments")
     parser.add_argument("--repeat", type=int, default=1, help="Additional arguments")
-    parser.add_argument("--num_batches", type=int, default=None, help="None means full dataset")
+    parser.add_argument("--num_batches", type=int, default=5, help="None means full dataset")
     parser.add_argument("--shuffle", type=bool, default=True, help="Additional arguments")
-    parser.add_argument("--fetch_impl", type=str, default="acyncio", help="threaded or acyncio")
+    parser.add_argument("--fetch_impl", type=str, default="threaded", help="threaded or acyncio")
+    parser.add_argument("--batch_pool", type=int, default=10, help="Batch pool to collect together")
     return parser
 
 
