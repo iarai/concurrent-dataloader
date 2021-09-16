@@ -111,7 +111,7 @@ def handle_arguments() -> argparse.ArgumentParser:
     parser.add_argument("--repeat", type=int, default=1, help="Additional arguments")
     parser.add_argument("--num_batches", type=int, default=5, help="None means full dataset")
     parser.add_argument("--shuffle", type=bool, default=True, help="Additional arguments")
-    parser.add_argument("--fetch_impl", type=str, default="threaded", help="threaded or acyncio")
+    parser.add_argument("--fetch_impl", type=str, default="threaded", help="threaded or asyncio")
     parser.add_argument("--batch_pool", type=int, default=10, help="Batch pool to collect together")
     return parser
 
