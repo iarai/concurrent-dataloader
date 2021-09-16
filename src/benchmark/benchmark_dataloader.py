@@ -96,13 +96,13 @@ def handle_arguments() -> argparse.ArgumentParser:
     parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
     parser.add_argument("--dataset", type=str, default="s3")
     parser.add_argument("--batch_size", type=int, default=50, help="Additional arguments")
-    parser.add_argument("--num_workers", type=int, default=2, help="Additional arguments")
+    parser.add_argument("--num_workers", type=int, default=1, help="Additional arguments")
     parser.add_argument(
         "--data_loader_type", type=str, default="sync", help="sync/async, async is CUDA stream processing"
     )
-    parser.add_argument("--num_fetch_workers", type=int, default=1, help="Additional arguments")
+    parser.add_argument("--num_fetch_workers", type=int, default=16, help="Additional arguments")
     parser.add_argument("--prefetch_factor", type=int, default=2, help="Additional arguments")
-    parser.add_argument("--repeat", type=int, default=10, help="Additional arguments")
+    parser.add_argument("--repeat", type=int, default=1, help="Additional arguments")
     parser.add_argument("--num_batches", type=int, default=None, help="None means full dataset")
     parser.add_argument("--shuffle", type=bool, default=True, help="Additional arguments")
     return parser

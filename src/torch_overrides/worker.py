@@ -3,7 +3,6 @@ r""""Contains definitions of the methods used by the _BaseDataLoaderIter workers
 These **needs** to be in global scope since Py2 doesn't support serializing
 static methods.
 """
-import logging
 import os
 import queue
 import random
@@ -231,6 +230,7 @@ def _worker_loop(
     num_workers,
     persistent_workers,
     num_fetch_workers,
+    batch_pool=10,
     initializer=None,
 ):
     if initializer is not None:
@@ -319,7 +319,28 @@ def _worker_loop(
                 init_exception = None
             else:
                 try:
-                    data = fetcher.fetch(index)
+                    batch_sizes = {}  # store the size of each batch (not always the same, e.g. last batch)
+                    batches = {}  # batch data
+                    # take r (that was already read)
+                    batch_sizes[idx] = len(index)
+                    for i in index:
+                        batches[i] = idx
+                    # take remaining ones
+                    for _ in range(batch_pool):
+                        if not index_queue.empty():
+                            current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
+                            batch_id, batch_indices = current_batch
+                            batch_sizes[batch_id] = len(batch_indices)
+                            for index in batch_indices:
+                                batches[index] = batch_id
+
+                    for batch, batch_id in fetcher.yield_batch(
+                        items=batches, items_flat=list(batches.keys()), batch_sizes=batch_sizes
+                    ):
+                        batch.sort(key=lambda index: index["item_id"])
+                        # print(f"Got batch {batch_id} ({len(batch)})")
+                        b = [b["tensor"] for b in batch]
+                        data_queue.put((batch_id, b))
                 except Exception as e:
                     if isinstance(e, StopIteration) and dataset_kind == _DatasetKind.Iterable:
                         data = _IterableDatasetStopIteration(worker_id)
@@ -332,9 +353,9 @@ def _worker_loop(
                         # `ExceptionWrapper` does the correct thing.
                         # See NOTE [ Python Traceback Reference Cycle Problem ]
                         data = ExceptionWrapper(where="in DataLoader worker process {}".format(worker_id))
-            # logging.info(f"Worker data: {worker_id} fetching {index}, {idx}")
-            data_queue.put((idx, data))
-            del data, idx, index, r  # save memory
+                        data_queue.put((idx, data))
+                        del data
+            del idx, index, r  # save memory
     except KeyboardInterrupt:
         # Main process will raise KeyboardInterrupt anyways.
         pass

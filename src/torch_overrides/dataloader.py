@@ -193,9 +193,11 @@ class DataLoader(Generic[T_co]):
         *,
         prefetch_factor: int = 2,
         persistent_workers: bool = False,
-        num_fetch_workers: int = 1
+        num_fetch_workers: int = 1,
+        batch_pool: int = 10,
     ):
         self.num_fetch_workers = num_fetch_workers
+        self.batch_pool = batch_pool
         torch._C._log_api_usage_once("python.data_loader")
 
         if num_workers < 0:
@@ -978,6 +980,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                     self._num_workers,
                     self._persistent_workers,
                     loader.num_fetch_workers,
+                    self.batch_pool,
                 ),
             )
             w.daemon = True
