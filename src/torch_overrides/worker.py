@@ -354,7 +354,7 @@ def _worker_loop(
                         # `ExceptionWrapper` does the correct thing.
                         # See NOTE [ Python Traceback Reference Cycle Problem ]
                         data = ExceptionWrapper(where="in DataLoader worker process {}".format(worker_id))
-            if fetch_impl is not "threaded":
+            if fetch_impl != "threaded":
                 data_queue.put((idx, data))
                 del data
             del idx, index, r  # save memory
