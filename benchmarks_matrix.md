@@ -1,12 +1,11 @@
-
 Full Cartesian product, prioritized.
 
 
 Procedures
 ----------
-fio-http (Luis)
-python plain (Christian)
-full benchmarking (Ivan)
+- fio-http (Luis)
+- python plain (Christian)
+- full benchmarking (Ivan)
 
 Sources
 -------
