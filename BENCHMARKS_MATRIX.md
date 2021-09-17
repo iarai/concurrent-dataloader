@@ -10,9 +10,8 @@ Procedures
 
 Sources
 -------
-
-- aws-eks
 - aws-ec2
+- aws-eks
 - compute TU
 - compute lnx
 - local desktop @ IARAI
@@ -21,6 +20,7 @@ Sources
 Target object storage
 ---------------------
 - aws-s3
+- tu ceph object storage
 - eks-rook-ceph
 - eks-minio
 - on-prem-rook-ceph
