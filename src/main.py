@@ -43,7 +43,7 @@ def get_dataset(dataset: str, additional_args: Optional[Any] = None, limit: Opti
     elif dataset == "s3":
         dataset = S3Dataset(
             # TODO magic constants... extract to cli... how to do in a generic way...
-            **json.load(open("s3_credentials.json")),
+            **json.load(open("s3_iarai_playground_imagenet.json")),
             index_file=Path("index-s3-val.json"),
             limit=limit,
             endpoint_url="http://s3.amazonaws.com",

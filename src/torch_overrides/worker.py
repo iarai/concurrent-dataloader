@@ -289,7 +289,6 @@ def _worker_loop(
         iteration_end = False
 
         watchdog = ManagerWatchdog()
-
         while watchdog.is_alive():
             try:
                 r = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
@@ -341,8 +340,8 @@ def _worker_loop(
                             # print(f"Got batch {batch_id} ({len(batch)})")
                             b = [b["tensor"] for b in batch]
                             data_queue.put((batch_id, b))
-                        else:
-                            data = fetcher.fetch(index)
+                    else:
+                        data = fetcher.fetch(index)
                 except Exception as e:
                     if isinstance(e, StopIteration) and dataset_kind == _DatasetKind.Iterable:
                         data = _IterableDatasetStopIteration(worker_id)
@@ -355,7 +354,7 @@ def _worker_loop(
                         # `ExceptionWrapper` does the correct thing.
                         # See NOTE [ Python Traceback Reference Cycle Problem ]
                         data = ExceptionWrapper(where="in DataLoader worker process {}".format(worker_id))
-            if fetch_impl == "asyncio":
+            if fetch_impl is not "threaded":
                 data_queue.put((idx, data))
                 del data
             del idx, index, r  # save memory

@@ -65,8 +65,12 @@ class _DatasetKind(object):
         if kind == _DatasetKind.Map:
             if fetch_impl == "asyncio":
                 return _AsyncMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
-            else:
+            elif fetch_impl == "threaded":
                 return _ThreadedMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
+            elif fetch_impl == "vanilla":
+                return _MapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last)
+            else:
+                raise ValueError("Provided fetcher implementation doesn't exist.")
         else:
             return _IterableDatasetFetcher(dataset, auto_collation, collate_fn, drop_last)
 

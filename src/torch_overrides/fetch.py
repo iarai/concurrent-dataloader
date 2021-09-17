@@ -48,10 +48,10 @@ class _IterableDatasetFetcher(_BaseDatasetFetcher):
 class _MapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):
         super(_MapDatasetFetcher, self).__init__(dataset, auto_collation, collate_fn, drop_last)
+        print("Initialized...")
 
     @stopwatch(trace_name="(4)-mapdataset-fetcher", trace_level=4)
     def fetch(self, possibly_batched_index):
-        # print("Overriden... {possibly_batched_index}")
         if self.auto_collation:
             data = [self.dataset[idx] for idx in possibly_batched_index]
         else:
