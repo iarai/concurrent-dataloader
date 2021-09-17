@@ -1,5 +1,5 @@
 Full Cartesian product, prioritized.
-![discussion](IMG_8262.jpg)
+![discussion](doc/IMG_8262.jpg)
 
 
 Procedures
