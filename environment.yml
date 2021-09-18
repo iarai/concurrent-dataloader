@@ -20,6 +20,8 @@ dependencies:
       - h5py==3.4.0
       - s3fs==2021.8.1
       - pytest==6.2.5
-      - boto3>=1.18.36,<1.19.0
+      - boto3
       - jupyter==1.0.0
       - humanize==3.11.0
+      - ray==1.6.0
+      - pyarrow==5.0.0
