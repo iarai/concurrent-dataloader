@@ -19,7 +19,7 @@ Use as:
 
 ```
 cd src
-export PYTHONPATH=$PWD
+export **PYTHONPATH=$PWD**
 python benchmark/benchmark_tensor_loading.py -a random_gpu
 python benchmark/benchmark_tensor_loading.py -a random_to_gpu
 python benchmark/benchmark_tensor_loading.py -a single_image
@@ -86,6 +86,9 @@ Here, `s3_dataset_configuration.json` looks like this:
   "index_file_download_url": "s3://iarai-playground/scratch/imagenet/index-s3-val.json"
 }
 ```
+
+Download index with: `aws s3 cp s3://iarai-playground/scratch/imagenet/index-s3-val.json .  --endpoint-url http://s3.amazonaws.com`
+
 Notice that if we do not pass credentials directly, `boto3` will look them up in the standard locations according to https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html.
 However, this files give us the flexibility to use custom s3 locations flexibly with relying on a central aws configuration and make these configurations shareable.
 

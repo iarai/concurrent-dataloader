@@ -46,6 +46,7 @@ def get_dataset(dataset: str, additional_args: Optional[Any] = None, limit: Opti
             **json.load(open("s3_iarai_playground_imagenet.json")),
             index_file=Path("index-s3-val.json"),
             limit=limit,
+            endpoint_url="http://s3.amazonaws.com",
         )
     elif dataset == "scratch":
         dataset = ScratchDataset(index_file=Path("index-scratch-val.json"), limit=limit)

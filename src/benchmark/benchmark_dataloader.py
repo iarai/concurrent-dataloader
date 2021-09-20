@@ -23,7 +23,7 @@ from torch_overrides.worker import _worker_loop
 def load_all(dataloader: DataLoader, num_batches: Optional[int] = None) -> None:
     try:
         for i, _ in enumerate(dataloader):
-            if i == num_batches - 1:
+            if num_batches is not None and i == num_batches - 1:
                 break
             pass
     except (StopIteration, EOFError) as e:
@@ -50,6 +50,8 @@ def benchmark_dataloader(
     device: str = "cuda",
     shuffle: bool = False,
     num_batches: Optional[int] = None,
+    fetch_impl: Optional[str] = None,
+    batch_pool: Optional[int] = None,
 ) -> None:
     action_player = ActionPlayer()
 
@@ -65,6 +67,8 @@ def benchmark_dataloader(
             collate_fn=collate,
             prefetch_factor=prefetch_factor,
             num_fetch_workers=num_fetch_workers,
+            fetch_impl=fetch_impl,
+            batch_pool=batch_pool,
         )
     else:
         data_loader = DataLoader(
@@ -75,6 +79,8 @@ def benchmark_dataloader(
             collate_fn=collate,
             prefetch_factor=prefetch_factor,
             num_fetch_workers=num_fetch_workers,
+            fetch_impl=fetch_impl,
+            batch_pool=batch_pool,
         )
 
     # TODO should we do this in a central place?
@@ -95,16 +101,18 @@ def handle_arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
     parser.add_argument("--dataset", type=str, default="s3")
-    parser.add_argument("--batch_size", type=int, default=50, help="Additional arguments")
-    parser.add_argument("--num_workers", type=int, default=2, help="Additional arguments")
+    parser.add_argument("--batch_size", type=int, default=10, help="Additional arguments")
+    parser.add_argument("--num_workers", type=int, default=1, help="Additional arguments")
     parser.add_argument(
         "--data_loader_type", type=str, default="sync", help="sync/async, async is CUDA stream processing"
     )
-    parser.add_argument("--num_fetch_workers", type=int, default=1, help="Additional arguments")
+    parser.add_argument("--num_fetch_workers", type=int, default=16, help="Additional arguments")
     parser.add_argument("--prefetch_factor", type=int, default=2, help="Additional arguments")
-    parser.add_argument("--repeat", type=int, default=10, help="Additional arguments")
-    parser.add_argument("--num_batches", type=int, default=None, help="None means full dataset")
+    parser.add_argument("--repeat", type=int, default=1, help="Additional arguments")
+    parser.add_argument("--num_batches", type=int, default=1, help="None means full dataset")
     parser.add_argument("--shuffle", type=bool, default=True, help="Additional arguments")
+    parser.add_argument("--fetch_impl", type=str, default="threaded", help="threaded, asyncio, vanilla")
+    parser.add_argument("--batch_pool", type=int, default=10, help="Batch pool to collect together")
     return parser
 
 
