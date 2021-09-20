@@ -30,12 +30,12 @@ def dump_metadata(args, output_base_folder):
         json.dump(metadata, f)
 
 
-def get_dataset(dataset: str, additional_args: Optional[Any] = None, limit: Optional[int] = None):
+def get_dataset(dataset: str, dataset_type: str = "val", additional_args: Optional[Any] = None, limit: Optional[int] = None):
     if dataset == "t4c":
         # TODO magic constants... extract to cli... how to do in a generic way...
         dataset = T4CDataset(
             **json.load(open("s3_iarai_playground_t4c21.json")),
-            index_file=Path("index-t4c.json"),
+            index_file=Path(f"index-t4c-{dataset_type}.json"),
             limit=limit,
             mode=HDF5S3MODE[additional_args],
         )
@@ -44,10 +44,10 @@ def get_dataset(dataset: str, additional_args: Optional[Any] = None, limit: Opti
         dataset = S3Dataset(
             # TODO magic constants... extract to cli... how to do in a generic way...
             **json.load(open("s3_iarai_playground_imagenet.json")),
-            index_file=Path("index-s3-val.json"),
+            index_file=Path(f"index-s3-{dataset_type}.json"),
             limit=limit,
             endpoint_url="http://s3.amazonaws.com",
         )
     elif dataset == "scratch":
-        dataset = ScratchDataset(index_file=Path("index-scratch-val.json"), limit=limit)
+        dataset = ScratchDataset(index_file=Path(f"index-scratch-{dataset_type}.json"), limit=limit)
     return dataset

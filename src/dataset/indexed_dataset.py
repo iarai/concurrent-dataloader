@@ -4,6 +4,8 @@ from pathlib import Path
 
 from PIL import Image
 from torch.utils.data import Dataset
+from typing import Type
+from torchvision import transforms
 
 
 class IndexedDataset(Dataset, abc.ABC):
@@ -22,4 +24,8 @@ class IndexedDataset(Dataset, abc.ABC):
     # TODO should this be part of sampler instead of dataset?
     @abc.abstractmethod
     def get_random_item(self) -> Image:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def set_transform(self, transform: transforms) -> None:
         raise NotImplementedError()

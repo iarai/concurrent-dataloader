@@ -13,7 +13,7 @@
 # limitations under the License.
 """
 This example is extended and adapted for storage-benchmarking from:
-
+https://github.com/PyTorchLightning/pytorch-lightning/blob/master/pl_examples/domain_templates/imagenet.py
 """
 import os
 from argparse import ArgumentParser, Namespace
@@ -33,15 +33,13 @@ import pytorch_lightning as pl
 from pl_examples import cli_lightning_logo
 from pytorch_lightning.core import LightningModule
 
+from dataset.indexed_dataset import IndexedDataset
+from main import get_dataset
+from torch_overrides.dataloader import DataLoader
+from data_loader.async_data_loader import AsynchronousLoader
+
 
 class ImageNetLightningModel(LightningModule):
-    """
-    >>> ImageNetLightningModel(data_path='missing')  # doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
-    ImageNetLightningModel(
-      (model): ResNet(...)
-    )
-    """
-
     # pull out resnet names from torchvision models
     MODEL_NAMES = sorted(
         name
@@ -51,7 +49,6 @@ class ImageNetLightningModel(LightningModule):
 
     def __init__(
             self,
-            data_path: str,
             arch: str = "resnet18",
             pretrained: bool = False,
             lr: float = 0.1,
@@ -59,6 +56,14 @@ class ImageNetLightningModel(LightningModule):
             weight_decay: float = 1e-4,
             batch_size: int = 4,
             workers: int = 2,
+            prefetch_factor=2,
+            num_fetch_workers=4,
+            device: str = "cuda",
+            data_loader_type: str = "sync",
+            shuffle: bool = False,
+            num_batches: Optional[int] = None,
+            fetch_impl: Optional[str] = None,
+            batch_pool: Optional[int] = None,
             **kwargs,
     ):
         super().__init__()
@@ -68,12 +73,22 @@ class ImageNetLightningModel(LightningModule):
         self.lr = lr
         self.momentum = momentum
         self.weight_decay = weight_decay
-        self.data_path = data_path
         self.batch_size = batch_size
         self.workers = workers
+        self.train_dataset = None
+        self.val_dataset = None
+        self.prefetch_factor = prefetch_factor
+        self.num_fetch_workers = num_fetch_workers
+        self.device = device
+        self.data_loader_type = data_loader_type
+        self.shuffle = shuffle
+        self.num_batches = num_batches
+        self.fetch_impl = fetch_impl
+        self.batch_pool = batch_pool
         self.model = models.__dict__[self.arch](pretrained=self.pretrained)
 
     def forward(self, x):
+        assert self.train_dataset is not None and self.val_dataset is not None, "Datasets are not initialized!"
         return self.model(x)
 
     def training_step(self, batch, batch_idx):
@@ -117,36 +132,57 @@ class ImageNetLightningModel(LightningModule):
         scheduler = lr_scheduler.LambdaLR(optimizer, lambda epoch: 0.1 ** (epoch // 30))
         return [optimizer], [scheduler]
 
+    def collate(self, batch):
+        imgs = [item for item in batch]  # noqa
+        return imgs
+
+    def get_dataloader(self, dataset):
+        dataset.set_transform(transform)
+        dataset.load_index()
+        if self.data_loader_type == "async":
+            data_loader = AsynchronousLoader(
+                data=self.dataset,
+                batch_size=self.batch_size,
+                num_workers=self.workers,
+                shuffle=self.shuffle,
+                device=self.device,
+                collate_fn=self.collate,
+                prefetch_factor=self.prefetch_factor,
+                num_fetch_workers=self.num_fetch_workers,
+                fetch_impl=self.fetch_impl,
+                batch_pool=self.batch_pool,
+            )
+        else:
+            data_loader = DataLoader(
+                dataset=self.dataset,
+                batch_size=self.batch_size,
+                num_workers=self.workers,
+                shuffle=self.shuffle,
+                collate_fn=self.collate,
+                prefetch_factor=self.prefetch_factor,
+                num_fetch_workers=self.num_fetch_workers,
+                fetch_impl=self.fetch_impl,
+                batch_pool=self.batch_pool,
+            )
+        return data_loader, dataset
+
     def train_dataloader(self):
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-
-        train_dir = os.path.join(self.data_path, "train")
-        train_dataset = datasets.ImageFolder(
-            train_dir,
-            transforms.Compose(
-                [transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip(), transforms.ToTensor(), normalize]
-            ),
+        transform = transforms.Compose(
+            [transforms.RandomResizedCrop(224), transforms.RandomHorizontalFlip(), transforms.ToTensor(), normalize]
         )
-
-        train_loader = torch.utils.data.DataLoader(
-            dataset=train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=self.workers
-        )
+        self.train_dataset.set_transform(transform)
+        train_loader = self.get_dataloader(self.train_dataset)
         return train_loader
 
     def val_dataloader(self):
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        val_dir = os.path.join(self.data_path, "val")
-        val_loader = torch.utils.data.DataLoader(
-            datasets.ImageFolder(
-                val_dir,
-                transforms.Compose(
-                    [transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(), normalize]
-                ),
-            ),
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.workers,
+        transform = transforms.Compose(
+            [transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(), normalize]
         )
+        self.val_dataset.set_transform(transform)
+        val_loader = self.get_dataloader(self.val_dataset)
+
         return val_loader
 
     def test_dataloader(self):
@@ -220,6 +256,10 @@ def main(args: Namespace) -> None:
         args.workers = int(args.workers / max(1, args.gpus))
 
     model = ImageNetLightningModel(**vars(args))
+
+    model.train_dataset = get_dataset(dataset="s3", dataset_type="train", additional_args=[])
+    model.val_dataset = get_dataset(dataset="s3", dataset_type="val", additional_args=[])
+
     trainer = pl.Trainer.from_argparse_args(args)
 
     if args.evaluate:
@@ -233,7 +273,8 @@ def run_cli():
 
     parent_parser = pl.Trainer.add_argparse_args(parent_parser)
     parent_parser.add_argument("--data-path", metavar="DIR", type=str, help="path to dataset")
-    parent_parser.add_argument("-e", "--evaluate", dest="evaluate", action="store_true", help="evaluate model on validation set")
+    parent_parser.add_argument("-e", "--evaluate", dest="evaluate", action="store_true",
+                               help="evaluate model on validation set")
     parent_parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
