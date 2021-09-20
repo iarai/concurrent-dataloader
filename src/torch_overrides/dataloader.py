@@ -13,6 +13,7 @@ import threading
 import warnings
 from typing import Any
 from typing import Callable
+from typing import Type
 from typing import Generic
 from typing import List
 from typing import Optional
@@ -61,7 +62,9 @@ class _DatasetKind(object):
     Iterable = 1
 
     @staticmethod
-    def create_fetcher(kind, dataset, auto_collation, collate_fn, drop_last, fetch_impl, num_fetch_workers=1):
+    def create_fetcher(kind: "_DatasetKind", dataset: Dataset, auto_collation: bool, collate_fn: Callable, drop_last: bool,
+                       fetch_impl: str,
+                       num_fetch_workers: int = 1):
         if kind == _DatasetKind.Map:
             if fetch_impl == "asyncio":
                 return _AsyncMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
