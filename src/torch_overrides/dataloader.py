@@ -17,6 +17,7 @@ from typing import Generic
 from typing import List
 from typing import Optional
 from typing import Sequence
+from typing import Type
 from typing import TypeVar
 
 import torch
@@ -61,7 +62,15 @@ class _DatasetKind(object):
     Iterable = 1
 
     @staticmethod
-    def create_fetcher(kind, dataset, auto_collation, collate_fn, drop_last, fetch_impl, num_fetch_workers=1):
+    def create_fetcher(
+        kind: "_DatasetKind",
+        dataset: Dataset,
+        auto_collation: bool,
+        collate_fn: Callable,
+        drop_last: bool,
+        fetch_impl: str,
+        num_fetch_workers: int = 1,
+    ):
         if kind == _DatasetKind.Map:
             if fetch_impl == "asyncio":
                 return _AsyncMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
@@ -207,6 +216,9 @@ class DataLoader(Generic[T_co]):
         self.num_fetch_workers = num_fetch_workers
         self.batch_pool = batch_pool
         self.fetch_impl = fetch_impl
+        # cannot have _SingleProcessDataLoaderIter for threaded implementation
+        if num_workers == 0 and self.fetch_impl == "threaded":
+            num_workers = 1
         torch._C._log_api_usage_once("python.data_loader")
 
         if num_workers < 0:

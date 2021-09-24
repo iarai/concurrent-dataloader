@@ -48,7 +48,6 @@ class _IterableDatasetFetcher(_BaseDatasetFetcher):
 class _MapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):
         super(_MapDatasetFetcher, self).__init__(dataset, auto_collation, collate_fn, drop_last)
-        print("Initialized...")
 
     @stopwatch(trace_name="(4)-mapdataset-fetcher", trace_level=4)
     def fetch(self, possibly_batched_index):
@@ -76,7 +75,8 @@ class _AsyncMapDatasetFetcher(_BaseDatasetFetcher):
             index = await task_queue.get()
             try:
                 result = await self.loop.run_in_executor(self._executor, self.dataset.__getitem__, index)
-                result = self.collate_fn(result)
+                # if self.collate_fn is not None:
+                #     result = self.collate_fn(result)
                 result_queue.put_nowait((index, result))
             except Exception as e:
                 print(f"Exception in fetch worker {worker_id}: {str(e)}")
@@ -112,7 +112,11 @@ class _AsyncMapDatasetFetcher(_BaseDatasetFetcher):
             result_list.append(result_queue.get_nowait())
 
         # sort wrt index
-        return result_list.sort(key=lambda v: v[0])
+        result_list.sort(key=lambda v: v[0])
+        # collate the batch (index 0 are indexes, not necessary after sorting)
+        if self.collate_fn is not None:
+            k = self.collate_fn(result_list)[1]
+        return result_list
 
     @stopwatch(trace_name="(4)-asyncmapdataset-fetcher", trace_level=4)
     def fetch(self, batch_indices: List[int]) -> List[Tensor]:
@@ -156,7 +160,7 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
                 - item_id, item identifier (=input argument item) for book keeping
         """
         result = self.dataset.__getitem__(item)
-        return {"tensor": self.collate_fn(result), "index": index, "item_id": item}
+        return {"tensor": result, "index": index, "item_id": item}
 
     def yield_item(self) -> dict:
         """Uses a ThreadPoolExecutor and creates a list of futures, i.e. tasks.

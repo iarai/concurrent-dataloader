@@ -13,12 +13,15 @@ def get_s3_bucket(
     aws_secret_access_key: Optional[str] = None,
     endpoint_url: Optional[str] = None,
     max_pool_connections: Optional[int] = 20,
+    max_retries: int = 100,
 ):
     boto3_module = importlib.import_module("boto3")
     botocore_module = importlib.import_module("botocore")
     # https://github.com/boto/boto3/issues/801#issuecomment-358195444
     s3_client = None
-    while not s3_client:
+    retries = 0
+    while not s3_client and retries < max_retries:
+        retries += 1
         try:
             s3_client = boto3_module.resource(
                 "s3",
@@ -29,6 +32,9 @@ def get_s3_bucket(
             )
         except BaseException:
             s3_client = None
+
+    if retries >= 100:
+        raise InterruptedError("Max retries for creating of s3_client reached!")
 
     s3_bucket = s3_client.Bucket(bucket_name)
     return s3_bucket

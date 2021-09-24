@@ -23,4 +23,6 @@ dependencies:
       - boto3
       - jupyter==1.0.0
       - humanize==3.11.0
+      - ray==1.6.0
+      - pyarrow==5.0.0
       - pytorch_lightning==1.4.7
