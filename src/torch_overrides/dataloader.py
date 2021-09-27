@@ -240,7 +240,7 @@ class DataLoader(Generic[T_co]):
         # cannot have _SingleProcessDataLoaderIter for threaded implementation
         self.num_workers = num_workers
         if self.num_workers == 0 and fetch_impl == "threaded":
-                self.num_workers = 1
+            self.num_workers = 1
         self.prefetch_factor = prefetch_factor
         self.pin_memory = pin_memory
         self.timeout = timeout
