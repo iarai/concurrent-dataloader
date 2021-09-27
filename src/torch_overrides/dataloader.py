@@ -216,9 +216,6 @@ class DataLoader(Generic[T_co]):
         self.num_fetch_workers = num_fetch_workers
         self.batch_pool = batch_pool
         self.fetch_impl = fetch_impl
-        # cannot have _SingleProcessDataLoaderIter for threaded implementation
-        if num_workers == 0 and self.fetch_impl == "threaded":
-            num_workers = 1
         torch._C._log_api_usage_once("python.data_loader")
 
         if num_workers < 0:
@@ -240,7 +237,9 @@ class DataLoader(Generic[T_co]):
             raise ValueError("persistent_workers option needs num_workers > 0")
 
         self.dataset = dataset
-        self.num_workers = num_workers
+        # cannot have _SingleProcessDataLoaderIter for threaded implementation
+        if num_workers == 0 and self.fetch_impl == "threaded":
+            num_workers = 1
         self.prefetch_factor = prefetch_factor
         self.pin_memory = pin_memory
         self.timeout = timeout
