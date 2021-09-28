@@ -137,9 +137,9 @@ def get_throughputs(df: DataFrame, group_by: List[str], row_filter: Dict[str, Li
     return df
 
 
-def get_thread_stats(df: DataFrame, group_by: List[str]):
+def get_thread_stats(df: DataFrame, group_by: List[str], trace_level=5):
     s = (
-        df[df["trace_level"] == 5]
+        df[df["trace_level"] == trace_level]
         .groupby("threading_ident")
         .agg(
             **{

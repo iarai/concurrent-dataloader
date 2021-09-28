@@ -31,10 +31,15 @@ import torchvision.transforms as transforms
 from functools import partial
 
 from main import get_dataset
+from main import init_benchmarking
 import pytorch_lightning as pl
 from pytorch_lightning.core import LightningModule
 from torch_overrides.dataloader import DataLoader
 from torch_overrides.worker import _worker_loop
+from misc.time_helper import stopwatch
+from misc.logging_configuration import initialize_logging
+import logging
+from pathlib import Path
 
 
 class ImageNetLightningModel(LightningModule):
@@ -76,6 +81,7 @@ class ImageNetLightningModel(LightningModule):
     def forward(self, x):
         return self.model(x)
 
+    @stopwatch(trace_name="(6)-training_step", trace_level=6)
     def training_step(self, batch, batch_idx):
         images, target = batch
         output = self(images)
@@ -86,6 +92,7 @@ class ImageNetLightningModel(LightningModule):
         self.log("train_acc5", acc5, on_step=True, on_epoch=True, logger=True)
         return loss_train
 
+    @stopwatch(trace_name="(7)-training_step", trace_level=7)
     def validation_step(self, batch, batch_idx):
         images, target = batch
         output = self(images)
@@ -180,6 +187,7 @@ class ImageNetLightningModel(LightningModule):
         return parent_parser
 
 
+# can be used for vanilla implementation
 def collate(batch):
     images, targets = list(zip(*batch))
     return images, targets
@@ -187,13 +195,14 @@ def collate(batch):
 
 def main(args: Namespace) -> None:
     # create datasets
-    val_dataset = get_dataset("s3", dataset_type="val", limit=args.dataset_limit)
-    train_dataset = get_dataset("s3", dataset_type="train", limit=args.dataset_limit)
+    val_dataset = get_dataset(args.dataset, dataset_type="val", limit=args.dataset_limit)
+    train_dataset = get_dataset(args.dataset, dataset_type="train", limit=args.dataset_limit)
     print(args.batch_size)
 
     # load index files
     val_dataset.load_index()
     train_dataset.load_index()
+    args.fetch_impl = "threaded"
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     transform = transforms.Compose(
@@ -222,7 +231,29 @@ def main(args: Namespace) -> None:
         batch_pool=args.batch_pool,
     )
 
-    torch.utils.data._utils.worker._worker_loop = partial(_worker_loop)
+    output_base_folder = init_benchmarking(
+        args=args,
+        action="_".join(
+            [
+                "benchmark_e2e",
+                str(args.dataset),
+                str(args.batch_size),
+                str(args.num_workers),
+                str(args.num_fetch_workers),
+                "sync",
+                # args.data_loader_type,
+            ]
+        ),
+    )
+    # args = vars(args)
+    # args["output_base_folder"] = output_base_folder
+
+    torch.utils.data._utils.worker._worker_loop = partial(
+        _worker_loop,
+        initializer=partial(
+            initialize_logging, loglevel=logging.getLogger().getEffectiveLevel(), output_base_folder=output_base_folder,
+        ),
+    )
 
     if args.seed is not None:
         pl.seed_everything(args.seed)
@@ -238,6 +269,11 @@ def main(args: Namespace) -> None:
     model = ImageNetLightningModel(train_dataloader=train_data_loader, val_dataloader=val_data_loader, **vars(args))
     trainer = pl.Trainer.from_argparse_args(args)
 
+    start_train(args, model, trainer)
+
+
+@stopwatch(trace_name="(8)-start_train", trace_level=8)
+def start_train(args, model, trainer):
     if args.evaluate:
         trainer.test(model)
     else:
@@ -258,7 +294,8 @@ def run_cli():
     parent_parser.add_argument("--num-fetch-workers", type=int, default=10)
     parent_parser.add_argument("--num-workers", type=int, default=1)
     parent_parser.add_argument("--prefetch-factor", type=int, default=2)
-    parent_parser.add_argument("--dataset", type=str, default="str", help="s3 | scratch")
+    parent_parser.add_argument("--dataset", type=str, default="s3", help="s3 | scratch")
+    parent_parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
     parser.set_defaults(profiler="simple", deterministic=True, max_epochs=12)
