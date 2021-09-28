@@ -201,7 +201,6 @@ def main(args: Namespace) -> None:
     # load index files
     val_dataset.load_index()
     train_dataset.load_index()
-    args.fetch_impl = "asyncio"
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     transform = transforms.Compose(
@@ -246,7 +245,6 @@ def main(args: Namespace) -> None:
     )
     # args = vars(args)
     # args["output_base_folder"] = output_base_folder
-
     torch.utils.data._utils.worker._worker_loop = partial(
         _worker_loop,
         initializer=partial(
@@ -287,7 +285,7 @@ def run_cli():
         "-e", "--evaluate", dest="evaluate", action="store_true", help="evaluate model on validation set"
     )
     parent_parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
-    parent_parser.add_argument("--fetch-impl", type=str, default="vanilla", help="vanilla | asyncio | threaded")
+    parent_parser.add_argument("--fetch-impl", type=str, default="asyncio", help="vanilla | asyncio | threaded")
     parent_parser.add_argument("--dataset-limit", type=int, default=50)
     parent_parser.add_argument("--batch-pool", type=int, default=10)
     parent_parser.add_argument("--num-fetch-workers", type=int, default=10)
