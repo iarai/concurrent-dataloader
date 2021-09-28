@@ -48,7 +48,8 @@ class S3Dataset(IndexedDataset):
                 aws_secret_access_key=aws_secret_access_key,
                 endpoint_url=endpoint_url,
             )
-        if classes_file_download_url is not None and not classes_file.exists():
+
+        if not classes_file.exists():
             download_file_from_s3_url(
                 s3_url=classes_file_download_url,
                 f=classes_file,
@@ -138,7 +139,6 @@ class S3Dataset(IndexedDataset):
 
     def __len__(self):
         if self.limit is None:
-            print("Returning len... ")
             return self.len
         return min(self.len, self.limit)
 

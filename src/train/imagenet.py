@@ -197,12 +197,11 @@ def main(args: Namespace) -> None:
     # create datasets
     val_dataset = get_dataset(args.dataset, dataset_type="val", limit=args.dataset_limit)
     train_dataset = get_dataset(args.dataset, dataset_type="train", limit=args.dataset_limit)
-    print(args.batch_size)
 
     # load index files
     val_dataset.load_index()
     train_dataset.load_index()
-    args.fetch_impl = "threaded"
+    args.fetch_impl = "asyncio"
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     transform = transforms.Compose(
@@ -298,7 +297,7 @@ def run_cli():
     parent_parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
-    parser.set_defaults(profiler="simple", deterministic=True, max_epochs=12)
+    parser.set_defaults(profiler="advanced", deterministic=True, max_epochs=12)
     args = parser.parse_args()
     main(args)
 

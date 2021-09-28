@@ -29,6 +29,16 @@ def dump_metadata(args, output_base_folder):
         metadata.update(platform.uname()._asdict())
         json.dump(metadata, f)
 
+def parse_args_file(json_file, dataset_type):
+    json_args = json.load(open(json_file))
+    for arg in list(json_args):
+        if dataset_type not in arg and "file_download_url" in arg:
+            del json_args[arg]
+        elif "file_download_url" in arg:
+            # rename the key
+            json_args[arg.replace(dataset_type + "_", "")] = json_args.pop(arg)
+    return json_args
+
 
 def get_dataset(
     dataset: str, dataset_type: str = "val", additional_args: Optional[Any] = None, limit: Optional[int] = None
@@ -44,7 +54,7 @@ def get_dataset(
     elif dataset == "s3":
         dataset = S3Dataset(
             # TODO magic constants... extract to cli... how to do in a generic way...
-            **json.load(open("s3_iarai_playground_imagenet.json")),
+            **parse_args_file("s3_iarai_playground_imagenet.json", dataset_type),
             index_file=Path(f"index-s3-{dataset_type}.json"),
             classes_file=Path(f"imagenet-s3-{dataset_type}-classes.json"),
             limit=limit,

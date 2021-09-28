@@ -71,4 +71,4 @@ def download_file_from_s3_url(
         aws_secret_access_key=aws_secret_access_key,
         endpoint_url=endpoint_url,
     )
-    s3_bucket.download_file(s3_loc.path, str(f))
+    s3_bucket.download_file(s3_loc.path.strip("/"), str(f))
