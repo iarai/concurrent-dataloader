@@ -231,7 +231,7 @@ def _worker_loop(
     persistent_workers,
     fetch_impl,
     num_fetch_workers,
-    batch_pool=10,
+    batch_pool=10,  # number of batches to fetch simultaneously
     initializer=None,
 ):
     if initializer is not None:
