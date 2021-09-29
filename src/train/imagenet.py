@@ -242,7 +242,6 @@ def main(args: Namespace) -> None:
     )
     # args = vars(args)
     # args["output_base_folder"] = output_base_folder
-
     torch.utils.data._utils.worker._worker_loop = partial(
         _worker_loop,
         initializer=partial(
