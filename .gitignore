@@ -148,3 +148,4 @@ output
 output_s3
 src/benchmark_output/
 .idea
+src/lightning_logs/
