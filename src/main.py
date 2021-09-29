@@ -56,11 +56,14 @@ def get_dataset(
             # TODO magic constants... extract to cli... how to do in a generic way...
             **parse_args_file("s3_iarai_playground_imagenet.json", dataset_type),
             index_file=Path(f"index-s3-{dataset_type}.json"),
-            classes_file=Path(f"imagenet-s3-{dataset_type}-classes.json"),
+            classes_file=Path(f"imagenet-{dataset_type}-classes.json"),
             limit=limit,
             endpoint_url="http://s3.amazonaws.com",
         )
     elif dataset == "scratch":
-        dataset = ScratchDataset(index_file=Path(f"index-scratch-{dataset_type}.json"), limit=limit)
+        dataset = ScratchDataset(
+            index_file=Path(f"index-scratch-{dataset_type}.json"), 
+            classes_file=Path(f"imagenet-{dataset_type}-classes.json"),
+            limit=limit)
     print(f"Dataset loaded ... {dataset}, {len(dataset)}")
     return dataset

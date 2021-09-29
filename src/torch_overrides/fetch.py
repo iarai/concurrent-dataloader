@@ -115,7 +115,7 @@ class _AsyncMapDatasetFetcher(_BaseDatasetFetcher):
         result_list.sort(key=lambda v: v[0])
         # collate the batch (index 0 are indexes, not necessary after sorting)
         if self.collate_fn is not None:
-            k = self.collate_fn(result_list)[1]
+            return self.collate_fn(result_list)[1]
         return result_list
 
     @stopwatch(trace_name="(4)-asyncmapdataset-fetcher", trace_level=4)

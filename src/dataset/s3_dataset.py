@@ -57,7 +57,6 @@ class S3Dataset(IndexedDataset):
                 aws_secret_access_key=aws_secret_access_key,
                 endpoint_url=endpoint_url,
             )
-        super().__init__(index_file=index_file)
         self.aws_access_key_id = aws_access_key_id
         self.aws_secret_access_key = aws_secret_access_key
         self.endpoint_url = endpoint_url
@@ -68,9 +67,7 @@ class S3Dataset(IndexedDataset):
         self.bucket_name = bucket_name
         self.rng = None
         self.classes = None
-
-        self.load_index()
-        self.load_classes()
+        super().__init__(index_file=index_file, classes_file=classes_file)
 
         self.len = len(self.image_paths)
         self.s3_bucket = None
@@ -133,19 +130,15 @@ class S3Dataset(IndexedDataset):
         b = BytesIO()
         self.s3_bucket.download_fileobj(self.image_paths[index], b)
         image = Image.open(b)
-        image = self.transform(image)
-
-        return image, target, b.getbuffer().nbytes
+        if image.mode == "L":
+                image = image.convert("RGB")
+        return self.transform(image), target, b.getbuffer().nbytes
 
     def __len__(self):
         if self.limit is None:
             return self.len
         return min(self.len, self.limit)
-
-    def load_classes(self) -> None:
-        with self.classes_file.open("r") as file:
-            self.classes = json.load(file)
-
+    
     @staticmethod
     def index_all(
         bucket_name: str,

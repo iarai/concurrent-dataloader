@@ -40,6 +40,7 @@ from misc.time_helper import stopwatch
 from misc.logging_configuration import initialize_logging
 import logging
 from pathlib import Path
+from pytorch_lightning.profiler import AdvancedProfiler
 
 
 class ImageNetLightningModel(LightningModule):
@@ -187,10 +188,10 @@ class ImageNetLightningModel(LightningModule):
         return parent_parser
 
 
-# can be used for vanilla implementation
-def collate(batch):
-    images, targets = list(zip(*batch))
-    return images, targets
+# can to be used for vanilla implementation
+# def collate(batch):
+#     images, targets = list(zip(*batch))
+#     return images, targets
 
 
 def main(args: Namespace) -> None:
@@ -198,10 +199,6 @@ def main(args: Namespace) -> None:
     val_dataset = get_dataset(args.dataset, dataset_type="val", limit=args.dataset_limit)
     train_dataset = get_dataset(args.dataset, dataset_type="train", limit=args.dataset_limit)
 
-    # load index files
-    val_dataset.load_index()
-    train_dataset.load_index()
-    args.fetch_impl = "asyncio"
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     transform = transforms.Compose(
@@ -240,7 +237,6 @@ def main(args: Namespace) -> None:
                 str(args.num_workers),
                 str(args.num_fetch_workers),
                 "sync",
-                # args.data_loader_type,
             ]
         ),
     )
@@ -266,7 +262,7 @@ def main(args: Namespace) -> None:
 
     # model = ImageNetLightningModel()
     model = ImageNetLightningModel(train_dataloader=train_data_loader, val_dataloader=val_data_loader, **vars(args))
-    trainer = pl.Trainer.from_argparse_args(args)
+    trainer = pl.Trainer.from_argparse_args(args, profiler=AdvancedProfiler(filename="train-profile"))
 
     start_train(args, model, trainer)
 
@@ -287,7 +283,7 @@ def run_cli():
         "-e", "--evaluate", dest="evaluate", action="store_true", help="evaluate model on validation set"
     )
     parent_parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
-    parent_parser.add_argument("--fetch-impl", type=str, default="vanilla", help="vanilla | asyncio | threaded")
+    parent_parser.add_argument("--fetch-impl", type=str, default="asyncio", help="vanilla | asyncio | threaded")
     parent_parser.add_argument("--dataset-limit", type=int, default=50)
     parent_parser.add_argument("--batch-pool", type=int, default=10)
     parent_parser.add_argument("--num-fetch-workers", type=int, default=10)
@@ -297,7 +293,7 @@ def run_cli():
     parent_parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
-    parser.set_defaults(profiler="advanced", deterministic=True, max_epochs=12)
+    parser.set_defaults(deterministic=True, max_epochs=10, gpus=[0])
     args = parser.parse_args()
     main(args)
 
