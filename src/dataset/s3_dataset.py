@@ -131,14 +131,14 @@ class S3Dataset(IndexedDataset):
         self.s3_bucket.download_fileobj(self.image_paths[index], b)
         image = Image.open(b)
         if image.mode == "L":
-                image = image.convert("RGB")
+            image = image.convert("RGB")
         return self.transform(image), target, b.getbuffer().nbytes
 
     def __len__(self):
         if self.limit is None:
             return self.len
         return min(self.len, self.limit)
-    
+
     @staticmethod
     def index_all(
         bucket_name: str,

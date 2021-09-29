@@ -11,36 +11,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""This example is largely adapted from
+https://github.com/pytorch/examples/blob/master/imagenet/main.py."""
+import logging
+from argparse import ArgumentParser
+from argparse import Namespace
+from functools import partial
+from pathlib import Path
 
-"""
-This example is largely adapted from https://github.com/pytorch/examples/blob/master/imagenet/main.py.
-"""
-
-import os
-from argparse import ArgumentParser, Namespace
-
-import torch
+import pytorch_lightning as pl
 import torch.nn.functional as F
 import torch.nn.parallel
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
-from functools import partial
-
 from main import get_dataset
 from main import init_benchmarking
-import pytorch_lightning as pl
+from misc.logging_configuration import initialize_logging
+from misc.time_helper import stopwatch
 from pytorch_lightning.core import LightningModule
+from pytorch_lightning.profiler import AdvancedProfiler
 from torch_overrides.dataloader import DataLoader
 from torch_overrides.worker import _worker_loop
-from misc.time_helper import stopwatch
-from misc.logging_configuration import initialize_logging
-import logging
-from pathlib import Path
-from pytorch_lightning.profiler import AdvancedProfiler
 
 
 class ImageNetLightningModel(LightningModule):
@@ -52,18 +46,18 @@ class ImageNetLightningModel(LightningModule):
     """
 
     def __init__(
-            self,
-            train_dataloader,
-            val_dataloader,
-            data_path: str,
-            arch: str = "resnet18",
-            pretrained: bool = False,
-            lr: float = 0.1,
-            momentum: float = 0.9,
-            weight_decay: float = 1e-4,
-            batch_size: int = 4,
-            workers: int = 2,
-            **kwargs,
+        self,
+        train_dataloader,
+        val_dataloader,
+        data_path: str,
+        arch: str = "resnet18",
+        pretrained: bool = False,
+        lr: float = 0.1,
+        momentum: float = 0.9,
+        weight_decay: float = 1e-4,
+        batch_size: int = 4,
+        workers: int = 2,
+        **kwargs,
     ):
         super().__init__()
         # self.save_hyperparameters()
@@ -105,7 +99,8 @@ class ImageNetLightningModel(LightningModule):
 
     @staticmethod
     def __accuracy(output, target, topk=(1,)):
-        """Computes the accuracy over the k top predictions for the specified values of k."""
+        """Computes the accuracy over the k top predictions for the specified
+        values of k."""
         with torch.no_grad():
             maxk = max(topk)
             batch_size = target.size(0)
@@ -154,10 +149,7 @@ class ImageNetLightningModel(LightningModule):
     def add_model_specific_args(parent_parser):  # pragma: no-cover
         parser = parent_parser.add_argument_group("ImageNetLightningModel")
         parser.add_argument(
-            "-a",
-            "--arch",
-            metavar="ARCH",
-            default="resnet18",
+            "-a", "--arch", metavar="ARCH", default="resnet18",
         )
         parser.add_argument(
             "-j", "--workers", default=1, type=int, metavar="N", help="number of data loading workers (default: 4)"
@@ -169,7 +161,7 @@ class ImageNetLightningModel(LightningModule):
             type=int,
             metavar="N",
             help="mini-batch size (default: 256), this is the total batch size of all GPUs on the current node"
-                 " when using Data Parallel or Distributed Data Parallel",
+            " when using Data Parallel or Distributed Data Parallel",
         )
         parser.add_argument(
             "--lr", "--learning-rate", default=0.1, type=float, metavar="LR", help="initial learning rate", dest="lr"
@@ -188,17 +180,10 @@ class ImageNetLightningModel(LightningModule):
         return parent_parser
 
 
-# can to be used for vanilla implementation
-# def collate(batch):
-#     images, targets = list(zip(*batch))
-#     return images, targets
-
-
 def main(args: Namespace) -> None:
     # create datasets
     val_dataset = get_dataset(args.dataset, dataset_type="val", limit=args.dataset_limit)
     train_dataset = get_dataset(args.dataset, dataset_type="train", limit=args.dataset_limit)
-
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     transform = transforms.Compose(
@@ -240,8 +225,6 @@ def main(args: Namespace) -> None:
             ]
         ),
     )
-    # args = vars(args)
-    # args["output_base_folder"] = output_base_folder
     torch.utils.data._utils.worker._worker_loop = partial(
         _worker_loop,
         initializer=partial(
@@ -259,7 +242,6 @@ def main(args: Namespace) -> None:
         args.batch_size = int(args.batch_size / max(1, args.gpus))
         args.workers = int(args.workers / max(1, args.gpus))
 
-    # model = ImageNetLightningModel()
     model = ImageNetLightningModel(train_dataloader=train_data_loader, val_dataloader=val_data_loader, **vars(args))
     trainer = pl.Trainer.from_argparse_args(args, profiler=AdvancedProfiler(filename="train-profile"))
 

@@ -29,6 +29,7 @@ def dump_metadata(args, output_base_folder):
         metadata.update(platform.uname()._asdict())
         json.dump(metadata, f)
 
+
 def parse_args_file(json_file, dataset_type):
     json_args = json.load(open(json_file))
     for arg in list(json_args):
@@ -62,8 +63,9 @@ def get_dataset(
         )
     elif dataset == "scratch":
         dataset = ScratchDataset(
-            index_file=Path(f"index-scratch-{dataset_type}.json"), 
+            index_file=Path(f"index-scratch-{dataset_type}.json"),
             classes_file=Path(f"imagenet-{dataset_type}-classes.json"),
-            limit=limit)
+            limit=limit,
+        )
     print(f"Dataset loaded ... {dataset}, {len(dataset)}")
     return dataset
