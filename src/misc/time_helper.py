@@ -35,6 +35,9 @@ def stopwatch(trace_name, trace_level: int, strip_result: bool = False):
             timer_end = timer()
             time_end = time.time()
             process_time_end = time.process_time()
+            global_step = -1
+            if trace_name == "(6)-training_step":
+                global_step = args[0].global_step
 
             data = {
                 "trace_name": trace_name,
@@ -48,6 +51,7 @@ def stopwatch(trace_name, trace_level: int, strip_result: bool = False):
                 "process_time_end": process_time_end,
                 "pid": os.getpid(),
                 "threading_ident": threading.get_ident(),
+                "global_step": global_step,
             }
             if strip_result:
                 data["len"] = result[1]

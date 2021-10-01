@@ -158,6 +158,7 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
         result = self.dataset.__getitem__(item)
         return {"tensor": self.collate_fn(result), "index": index, "item_id": item}
 
+    @stopwatch(trace_name="(4)-threadedmapdataset-fetcher", trace_level=4)
     def yield_item(self) -> dict:
         """Uses a ThreadPoolExecutor and creates a list of futures, i.e. tasks.
         Each task returns a single data item, and as the results come in, they
@@ -179,7 +180,7 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
                 except Exception as exc:
                     print(f"Exception in fetcher: {str(exc)}")
 
-    @stopwatch(trace_name="(4)-threadedmapdataset-fetcher", trace_level=4)
+    # @stopwatch(trace_name="(4)-threadedmapdataset-fetcher", trace_level=4)
     def yield_batch(self, items, batch_sizes) -> dict:
         """Arguments.
 
