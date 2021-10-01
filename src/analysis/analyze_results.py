@@ -5,12 +5,14 @@ from json import JSONDecodeError
 from pathlib import Path
 from typing import Dict
 from typing import List
+from typing import Optional
 
 import humanize
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import tqdm
 from pandas import DataFrame
 
@@ -112,7 +114,8 @@ def get_run_stats(df: DataFrame, group_by: List[str], row_filter: Dict[str, List
         for col, items in row_filter.items():
             df = df.filter(index=col, items=items, axis=0)
     df = df.groupby(group_by + ["run"]).agg(
-        **{"downloaded data [B]": ("len", "sum"), "time_start": ("time_start", "min"), "time_end": ("time_end", "max"),}
+        **{"downloaded data [B]": ("len", "sum"), "time_start": ("time_start", "min"),
+           "time_end": ("time_end", "max"), }
     )
     df["total_elpased_time [s]"] = df["time_end"] - df["time_start"]
     df["downloaded data [MB]"] = df["downloaded data [B]"] / 10 ** 6
@@ -140,8 +143,8 @@ def get_throughputs(df: DataFrame, group_by: List[str], row_filter: Dict[str, Li
 def get_thread_stats(df: DataFrame, group_by: List[str], trace_level=5):
     s = (
         df[df["trace_level"] == trace_level]
-        .groupby("threading_ident")
-        .agg(
+            .groupby("threading_ident")
+            .agg(
             **{
                 "time_start_thread": ("time_start", "min"),
                 "time_end_thread": ("time_end", "max"),
@@ -203,7 +206,7 @@ def plot_throughput_per_storage(df, group_by: List[str]):
 
     # https://en.wikipedia.org/wiki/Data-rate_units#Megabit_per_second
     df_aggregated_over_runs["throughput [Mbit/s]"] = (
-        df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / 10 ** 6 * 8
+            df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / 10 ** 6 * 8
     )
     df_aggregated_over_runs["min_throughput"] = df_aggregated_over_runs["min_throughput"]
 
@@ -259,7 +262,11 @@ def plot_throughput_per_storage(df, group_by: List[str]):
     ax2.set_ylabel("Request time [s]")
 
 
-def plot_events_timeline(df_dataloader, color_column: str = "threading_ident", cycle=11, summary_only=False):
+def plot_events_timeline(df_dataloader,
+                         color_column: str = "threading_ident",
+                         cycle=11,
+                         summary_only=False,
+                         ):
     df_dataloader = df_dataloader.sort_values(
         ["pid", "trace_level", "threading_ident", "time_start"], ascending=[False, False, False, False]
     ).reset_index(drop=True)
@@ -295,6 +302,67 @@ def plot_events_timeline(df_dataloader, color_column: str = "threading_ident", c
     ax.margins(0.1)
 
 
+import numpy as np
+import seaborn as sns
+
+
+def plot_events_timeline_detailed(df_dataloader,
+                                  color_column: str = "threading_ident",
+                                  cycle=11,
+                                  highlight_thread: int = None,
+                                  filter_function: str = None,
+                                  ):
+    if filter_function is not None:
+        df_dataloader = df_dataloader[df_dataloader["function_name"] == filter_function]
+
+    color_list = {}
+    thread_ids = np.array(list(df_dataloader["threading_ident"]))
+    pallete = sns.color_palette(None, len(np.unique(thread_ids)))
+    thread_runtimes = {}
+    for index, t in enumerate(np.unique(thread_ids)):
+        color_list[t] = pallete[index]
+        thread_runtimes[t] = max(df_dataloader[df_dataloader["threading_ident"] == t]["time_end"]) - min(
+            df_dataloader[df_dataloader["threading_ident"] == t]["time_start"])
+    df_dataloader = df_dataloader.sort_values(["pid", "threading_ident", "trace_level", "time_start"],
+                                              ascending=[False, False, False, False]).reset_index(drop=True)
+
+    min_time = min(df_dataloader["time_start"])
+    max_time = max(df_dataloader["time_end"]) - min_time
+
+    dict_dataloader = df_dataloader.to_dict("index")
+    print(len(dict_dataloader.items()))
+
+    colors = []
+    lines = []
+    texts = []
+    for index, t in enumerate(np.unique(thread_ids)):
+        last_i = 0
+        for i, (_, param_series) in enumerate(dict_dataloader.items()):
+            if param_series["threading_ident"] == t:
+                last_i = i
+                lines.append([(param_series["time_start"] - min_time, i), (param_series["time_end"] - min_time, i)])
+                if highlight_thread is not None:
+                    if param_series["threading_ident"] == highlight_thread:
+                        colors.append("black")
+                    else:
+                        colors.append("red")
+                else:
+                    colors.append(color_list[param_series["threading_ident"]])
+        lines.append([(0, last_i), (max_time, last_i)])
+        texts.append((thread_runtimes[t], 0, last_i))
+        colors.append("silver")
+
+    print(f"Lines num: {len(lines)}")
+
+    lc = matplotlib.collections.LineCollection(lines, colors=colors, linewidths=2)
+    fig, ax = plt.subplots(figsize=(50, 50))
+    ax.add_collection(lc)
+    for i in texts:
+        ax.text(i[1], i[2], i[0])
+    ax.autoscale()
+    ax.margins(0.1)
+
+
 def parse_results_log(working_file_path: str) -> List[Dict]:
     with open(working_file_path, "r") as f:
         skipped_lines_count = 0
@@ -310,7 +378,7 @@ def parse_results_log(working_file_path: str) -> List[Dict]:
 
 
 def extract_pandas(
-    output_base_folder: Path, folder_filter: str = "**", filter_by_metadata: Dict[str, List[str]] = None,
+        output_base_folder: Path, folder_filter: str = "**", filter_by_metadata: Dict[str, List[str]] = None,
 ):
     files = list(output_base_folder.rglob(f"{folder_filter}/results-*.log"))
     data = []
