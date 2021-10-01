@@ -119,7 +119,6 @@ def handle_arguments() -> argparse.ArgumentParser:
 def main(*args):
     parser = handle_arguments()
     args = parser.parse_args(args)
-
     output_base_folder = init_benchmarking(
         args=args,
         action="_".join(

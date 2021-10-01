@@ -13,11 +13,11 @@ import threading
 import warnings
 from typing import Any
 from typing import Callable
-from typing import Type
 from typing import Generic
 from typing import List
 from typing import Optional
 from typing import Sequence
+from typing import Type
 from typing import TypeVar
 
 import torch
@@ -62,9 +62,15 @@ class _DatasetKind(object):
     Iterable = 1
 
     @staticmethod
-    def create_fetcher(kind: "_DatasetKind", dataset: Dataset, auto_collation: bool, collate_fn: Callable, drop_last: bool,
-                       fetch_impl: str,
-                       num_fetch_workers: int = 1):
+    def create_fetcher(
+        kind: "_DatasetKind",
+        dataset: Dataset,
+        auto_collation: bool,
+        collate_fn: Callable,
+        drop_last: bool,
+        fetch_impl: str,
+        num_fetch_workers: int = 1,
+    ):
         if kind == _DatasetKind.Map:
             if fetch_impl == "asyncio":
                 return _AsyncMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
@@ -231,7 +237,10 @@ class DataLoader(Generic[T_co]):
             raise ValueError("persistent_workers option needs num_workers > 0")
 
         self.dataset = dataset
+        # cannot have _SingleProcessDataLoaderIter for threaded implementation
         self.num_workers = num_workers
+        if self.num_workers == 0 and fetch_impl == "threaded":
+            self.num_workers = 1
         self.prefetch_factor = prefetch_factor
         self.pin_memory = pin_memory
         self.timeout = timeout

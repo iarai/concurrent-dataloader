@@ -7,14 +7,13 @@ from urllib.parse import urlparse
 # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
 
 
-
 def get_s3_bucket(
-        bucket_name: str,
-        aws_access_key_id: Optional[str] = None,
-        aws_secret_access_key: Optional[str] = None,
-        endpoint_url: Optional[str] = None,
-        max_pool_connections: Optional[int] = 20,
-        max_retries: int = 100
+    bucket_name: str,
+    aws_access_key_id: Optional[str] = None,
+    aws_secret_access_key: Optional[str] = None,
+    endpoint_url: Optional[str] = None,
+    max_pool_connections: Optional[int] = 20,
+    max_retries: int = 100,
 ):
     boto3_module = importlib.import_module("boto3")
     botocore_module = importlib.import_module("botocore")
@@ -42,11 +41,11 @@ def get_s3_bucket(
 
 
 def upload_file_to_s3_url(
-        f: Union[str, Path],
-        s3_url: str,
-        aws_access_key_id: Optional[str] = None,
-        aws_secret_access_key: Optional[str] = None,
-        endpoint_url: Optional[str] = None,
+    f: Union[str, Path],
+    s3_url: str,
+    aws_access_key_id: Optional[str] = None,
+    aws_secret_access_key: Optional[str] = None,
+    endpoint_url: Optional[str] = None,
 ):
     s3_loc = urlparse(s3_url, allow_fragments=False)
     s3_bucket = get_s3_bucket(
@@ -59,11 +58,11 @@ def upload_file_to_s3_url(
 
 
 def download_file_from_s3_url(
-        f: Union[str, Path],
-        s3_url: str,
-        aws_access_key_id: Optional[str] = None,
-        aws_secret_access_key: Optional[str] = None,
-        endpoint_url: Optional[str] = None,
+    f: Union[str, Path],
+    s3_url: str,
+    aws_access_key_id: Optional[str] = None,
+    aws_secret_access_key: Optional[str] = None,
+    endpoint_url: Optional[str] = None,
 ):
     s3_loc = urlparse(s3_url, allow_fragments=False)
     s3_bucket = get_s3_bucket(
@@ -72,4 +71,4 @@ def download_file_from_s3_url(
         aws_secret_access_key=aws_secret_access_key,
         endpoint_url=endpoint_url,
     )
-    s3_bucket.download_file(s3_loc.path, str(f))
+    s3_bucket.download_file(s3_loc.path.strip("/"), str(f))

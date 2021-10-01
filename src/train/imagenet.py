@@ -35,7 +35,7 @@ from pytorch_lightning.core import LightningModule
 from pytorch_lightning.profiler import AdvancedProfiler
 from torch_overrides.dataloader import DataLoader
 from torch_overrides.worker import _worker_loop
-from data_loader.async_data_loader import AsynchronousLoader
+
 
 class ImageNetLightningModel(LightningModule):
     """
@@ -264,18 +264,17 @@ def run_cli():
         "-e", "--evaluate", dest="evaluate", action="store_true", help="evaluate model on validation set"
     )
     parent_parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
-    parent_parser.add_argument("--fetch-impl", type=str, default="vanilla", help="vanilla | asyncio | threaded")
+    parent_parser.add_argument("--fetch-impl", type=str, default="asyncio", help="vanilla | asyncio | threaded")
     parent_parser.add_argument("--dataset-limit", type=int, default=50)
     parent_parser.add_argument("--batch-pool", type=int, default=10)
     parent_parser.add_argument("--num-fetch-workers", type=int, default=10)
-    parent_parser.add_argument("--num-workers", type=int, default=0)
+    parent_parser.add_argument("--num-workers", type=int, default=1)
     parent_parser.add_argument("--prefetch-factor", type=int, default=2)
     parent_parser.add_argument("--dataset", type=str, default="s3", help="s3 | scratch")
     parent_parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
-    # parser.set_defaults(deterministic=True, max_epochs=10, gpus=[0])
-    parser.set_defaults(deterministic=True, max_epochs=10)
+    parser.set_defaults(deterministic=True, max_epochs=10, gpus=[0])
     args = parser.parse_args()
     main(args)
 

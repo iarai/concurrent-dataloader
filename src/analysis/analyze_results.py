@@ -137,9 +137,9 @@ def get_throughputs(df: DataFrame, group_by: List[str], row_filter: Dict[str, Li
     return df
 
 
-def get_thread_stats(df: DataFrame, group_by: List[str]):
+def get_thread_stats(df: DataFrame, group_by: List[str], trace_level=5):
     s = (
-        df[df["trace_level"] == 5]
+        df[df["trace_level"] == trace_level]
         .groupby("threading_ident")
         .agg(
             **{
@@ -259,17 +259,22 @@ def plot_throughput_per_storage(df, group_by: List[str]):
     ax2.set_ylabel("Request time [s]")
 
 
-def plot_events_timeline(df_dataloader, color_column: str = "threading_ident", cycle=11):
+def plot_events_timeline(df_dataloader, color_column: str = "threading_ident", cycle=11, summary_only=False):
     df_dataloader = df_dataloader.sort_values(
         ["pid", "trace_level", "threading_ident", "time_start"], ascending=[False, False, False, False]
     ).reset_index(drop=True)
 
     total_elapsed = df_dataloader["time_end"].max() - df_dataloader["time_start"].min()
     total_bytes = df_dataloader["len"].sum()
+    overall_rate_mbps = {humanize.naturalsize(total_bytes / total_elapsed)}
+    overall_rate_mbitps = {humanize.naturalsize(total_bytes / total_elapsed * 8)}
     print(f"total_elapsed={timedelta(seconds=total_elapsed)}")
     print(f"total_bytes={humanize.naturalsize(total_bytes)}")
-    print(f"overall rate {humanize.naturalsize(total_bytes / total_elapsed)}/s")
-    print(f"overall rate {humanize.naturalsize(total_bytes / total_elapsed * 8)}it/s")
+    print(f"overall rate {overall_rate_mbps}/s")
+    print(f"overall rate {overall_rate_mbitps}it/s")
+
+    if summary_only:
+        return overall_rate_mbps, overall_rate_mbitps
 
     dict_dataloader = df_dataloader.to_dict("index")
     threading_idents = {d[color_column] for d in dict_dataloader.values()}

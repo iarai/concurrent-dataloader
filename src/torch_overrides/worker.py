@@ -231,7 +231,7 @@ def _worker_loop(
     persistent_workers,
     fetch_impl,
     num_fetch_workers,
-    batch_pool=10,
+    batch_pool=10,  # number of batches to fetch simultaneously
     initializer=None,
 ):
     if initializer is not None:
@@ -338,7 +338,7 @@ def _worker_loop(
                         for batch, batch_id in fetcher.yield_batch(items=batches, batch_sizes=batch_sizes):
                             batch.sort(key=lambda index: index["item_id"])
                             # print(f"Got batch {batch_id} ({len(batch)})")
-                            b = [b["tensor"] for b in batch]
+                            b = collate_fn([b["tensor"] for b in batch])
                             data_queue.put((batch_id, b))
                     else:
                         data = fetcher.fetch(index)
