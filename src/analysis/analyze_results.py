@@ -15,6 +15,8 @@ import pandas as pd
 import seaborn as sns
 import tqdm
 from pandas import DataFrame
+import numpy as np
+import seaborn as sns
 
 
 def plot_all(df: DataFrame, function_name: str, group_by: List[str], plot_max=True, log_scale=True, figsize=(50, 50)):
@@ -302,13 +304,8 @@ def plot_events_timeline(df_dataloader,
     ax.margins(0.1)
 
 
-import numpy as np
-import seaborn as sns
-
-
 def plot_events_timeline_detailed(df_dataloader,
                                   color_column: str = "threading_ident",
-                                  cycle=11,
                                   highlight_thread: int = None,
                                   filter_function: str = None,
                                   ):
@@ -395,10 +392,11 @@ def extract_pandas(
         results = pd.DataFrame.from_records(data=results)
 
         for k, v in metadata.items():
-            results[k] = v
             if not isinstance(v, (int, float, complex)):
                 results[k] = str(v)
-
+            else:
+                results[k] = v
+                
         results["source_file"] = working_file_path
         results["run"] = working_file_path.parent.name
 
