@@ -242,7 +242,10 @@ class DataLoader(Generic[T_co]):
         if self.num_workers == 0 and fetch_impl == "threaded":
             self.num_workers = 1
         self.prefetch_factor = prefetch_factor
-        self.pin_memory = pin_memory
+        if pin_memory == 0:
+            self.pin_memory = False
+        else:
+            self.pin_memory = True
         self.timeout = timeout
         self.worker_init_fn = worker_init_fn
         self.multiprocessing_context = multiprocessing_context

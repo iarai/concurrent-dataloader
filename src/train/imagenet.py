@@ -87,7 +87,7 @@ class ImageNetLightningModel(LightningModule):
         self.log("train_acc5", acc5, on_step=True, on_epoch=True, logger=True)
         return loss_train
 
-    @stopwatch(trace_name="(7)-training_step", trace_level=7)
+    @stopwatch(trace_name="(7)-validation_step", trace_level=7)
     def validation_step(self, batch, batch_idx):
         images, target = batch
         output = self(images)
@@ -154,15 +154,15 @@ class ImageNetLightningModel(LightningModule):
         parser.add_argument(
             "-j", "--workers", default=1, type=int, metavar="N", help="number of data loading workers (default: 4)"
         )
-        parser.add_argument(
-            "-b",
-            "--batch-size",
-            default=4,
-            type=int,
-            metavar="N",
-            help="mini-batch size (default: 256), this is the total batch size of all GPUs on the current node"
-            " when using Data Parallel or Distributed Data Parallel",
-        )
+        # parser.add_argument(
+        #     "-b",
+        #     "--batch-size",
+        #     default=4,
+        #     type=int,
+        #     metavar="N",
+        #     help="mini-batch size (default: 256), this is the total batch size of all GPUs on the current node"
+        #     " when using Data Parallel or Distributed Data Parallel",
+        # )
         parser.add_argument(
             "--lr", "--learning-rate", default=0.1, type=float, metavar="LR", help="initial learning rate", dest="lr"
         )
@@ -200,6 +200,7 @@ def main(args: Namespace) -> None:
         num_fetch_workers=args.num_fetch_workers,
         fetch_impl=args.fetch_impl,
         batch_pool=args.batch_pool,
+        pin_memory=args.pin_memory,
     )
     val_data_loader = DataLoader(
         dataset=val_dataset,
@@ -210,6 +211,7 @@ def main(args: Namespace) -> None:
         num_fetch_workers=args.num_fetch_workers,
         fetch_impl=args.fetch_impl,
         batch_pool=args.batch_pool,
+        pin_memory=args.pin_memory,
     )
 
     output_base_folder = init_benchmarking(
@@ -243,7 +245,7 @@ def main(args: Namespace) -> None:
         args.workers = int(args.workers / max(1, args.gpus))
 
     model = ImageNetLightningModel(train_dataloader=train_data_loader, val_dataloader=val_data_loader, **vars(args))
-    trainer = pl.Trainer.from_argparse_args(args, profiler=AdvancedProfiler(filename="train-profile"))
+    trainer = pl.Trainer.from_argparse_args(args, profiler=AdvancedProfiler(filename="train-profile"), log_every_n_steps=10)
 
     start_train(args, model, trainer)
 
@@ -272,9 +274,11 @@ def run_cli():
     parent_parser.add_argument("--prefetch-factor", type=int, default=2)
     parent_parser.add_argument("--dataset", type=str, default="s3", help="s3 | scratch")
     parent_parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
+    parent_parser.add_argument("--batch-size", type=int, default=4)
+    parent_parser.add_argument("--pin-memory", type=int, default=0)
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
-    parser.set_defaults(deterministic=True, max_epochs=10, gpus=[0])
+    parser.set_defaults(deterministic=True, max_epochs=5, gpus=[0])
     args = parser.parse_args()
     main(args)
 
