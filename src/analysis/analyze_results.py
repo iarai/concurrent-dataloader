@@ -268,6 +268,7 @@ def plot_events_timeline(df_dataloader,
                          color_column: str = "threading_ident",
                          cycle=11,
                          summary_only=False,
+                         verbose=True,
                          ):
     df_dataloader = df_dataloader.sort_values(
         ["pid", "trace_level", "threading_ident", "time_start"], ascending=[False, False, False, False]
@@ -277,10 +278,11 @@ def plot_events_timeline(df_dataloader,
     total_bytes = df_dataloader["len"].sum()
     overall_rate_mbps = {humanize.naturalsize(total_bytes / total_elapsed)}
     overall_rate_mbitps = {humanize.naturalsize(total_bytes / total_elapsed * 8)}
-    print(f"total_elapsed={timedelta(seconds=total_elapsed)}")
-    print(f"total_bytes={humanize.naturalsize(total_bytes)}")
-    print(f"overall rate {overall_rate_mbps}/s")
-    print(f"overall rate {overall_rate_mbitps}it/s")
+    if verbose:
+        print(f"total_elapsed={timedelta(seconds=total_elapsed)}")
+        print(f"total_bytes={humanize.naturalsize(total_bytes)}")
+        print(f"overall rate {overall_rate_mbps}/s")
+        print(f"overall rate {overall_rate_mbitps}it/s")
 
     if summary_only:
         return overall_rate_mbps, overall_rate_mbitps
