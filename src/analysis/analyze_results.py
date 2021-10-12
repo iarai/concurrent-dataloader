@@ -17,6 +17,7 @@ import tqdm
 from pandas import DataFrame
 import numpy as np
 import seaborn as sns
+from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 
 def plot_all(df: DataFrame, function_name: str, group_by: List[str], plot_max=True, log_scale=True, figsize=(50, 50)):
@@ -372,7 +373,7 @@ def parse_results_log(working_file_path: str) -> List[Dict]:
             except JSONDecodeError:
                 skipped_lines_count += 1
     if skipped_lines_count > 0:
-        logging.warning("Skipped %s lines while reading %s", skipped_lines_count, working_file_path)
+        logging.warning("Skipped %s lines while readinget_thread_statsg %s", skipped_lines_count, working_file_path)
     return data
 
 
@@ -398,7 +399,7 @@ def extract_pandas(
                 results[k] = str(v)
             else:
                 results[k] = v
-                
+
         results["source_file"] = working_file_path
         results["run"] = working_file_path.parent.name
 
@@ -410,3 +411,20 @@ def extract_pandas(
     df = pd.concat(data)
     df.groupby
     return df
+
+
+def extract_gpu_utilization(output_base_folder: Path, folder_filter: str = "**"):
+    folders = list(output_base_folder.rglob(f"{folder_filter}"))
+    files = output_base_folder.rglob(f"{folder_filter}/lightning/default/version_0")
+    data = pd.DataFrame()
+    for working_file_path in tqdm.tqdm(files, total=len(folders)):
+        event_acc = EventAccumulator(str(working_file_path))
+        event_acc.Reload()
+        w_times, step_nums, vals = zip(*event_acc.Scalars('device_id: 0/utilization.gpu (%)'))
+        data = data.append({"run": working_file_path.parent.parent.parent.name,
+                            "gpu": np.array(vals),
+                            "gpu_mean": np.array(vals).mean(),
+                            "gpu_median": np.median(np.array(vals)),
+                            "std": np.std(np.array(vals)),
+                            }, ignore_index=True)
+    return data

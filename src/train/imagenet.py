@@ -35,7 +35,8 @@ from pytorch_lightning.core import LightningModule
 from pytorch_lightning.profiler import AdvancedProfiler
 from torch_overrides.dataloader import DataLoader
 from torch_overrides.worker import _worker_loop
-
+from pytorch_lightning.callbacks import GPUStatsMonitor
+from pytorch_lightning import loggers as pl_loggers
 
 class ImageNetLightningModel(LightningModule):
     """
@@ -227,6 +228,7 @@ def main(args: Namespace) -> None:
             ]
         ),
     )
+
     torch.utils.data._utils.worker._worker_loop = partial(
         _worker_loop,
         initializer=partial(
@@ -245,7 +247,12 @@ def main(args: Namespace) -> None:
         args.workers = int(args.workers / max(1, args.gpus))
 
     model = ImageNetLightningModel(train_dataloader=train_data_loader, val_dataloader=val_data_loader, **vars(args))
-    trainer = pl.Trainer.from_argparse_args(args, profiler=AdvancedProfiler(filename="train-profile"), log_every_n_steps=10)
+    tb_logger = pl_loggers.TensorBoardLogger(f"{output_base_folder}/lightning/")
+    trainer = pl.Trainer.from_argparse_args(args,
+                                            profiler="simple",
+                                            logger=tb_logger,
+                                            log_every_n_steps=10,
+                                            callbacks=[GPUStatsMonitor()])
 
     start_train(args, model, trainer)
 
@@ -278,6 +285,7 @@ def run_cli():
     parent_parser.add_argument("--pin-memory", type=int, default=0)
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
+    # parser.set_defaults(deterministic=True, max_epochs=5)
     parser.set_defaults(deterministic=True, max_epochs=5, gpus=[0])
     args = parser.parse_args()
     main(args)
