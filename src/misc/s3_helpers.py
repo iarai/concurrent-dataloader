@@ -12,7 +12,7 @@ def get_s3_bucket(
     aws_access_key_id: Optional[str] = None,
     aws_secret_access_key: Optional[str] = None,
     endpoint_url: Optional[str] = None,
-    max_pool_connections: Optional[int] = 20,
+    max_pool_connections: Optional[int] = 60,
     max_retries: int = 100,
 ):
     boto3_module = importlib.import_module("boto3")

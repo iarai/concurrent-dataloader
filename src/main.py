@@ -67,5 +67,6 @@ def get_dataset(
             classes_file=Path(f"imagenet-{dataset_type}-classes.json"),
             limit=limit,
         )
-    print(f"Dataset loaded ... {dataset}, {len(dataset)}")
+    #print(f"Dataset loaded ... {dataset}, {len(dataset)}")
+    print(f"Dataset loaded ... {dataset}, {dataset_type}, {len(dataset)}")
     return dataset

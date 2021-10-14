@@ -38,7 +38,7 @@
 #     for batch_size in 8 16 32 64; do
 #       for num_workers in 0 2 4 8 16; do
 #         for num_fetch_workers in 4 8 16 32; do
-#           python3 benchmark/benchmark_dataloader.py --output_base_folder /iarai/home/ivan.svogor/git/storage-benchmarking/src/benchmark_output/dataloader \
+#           python3 benchmark/benchmark_dataloader.py --output_base_folder /iarai/home/ivan.svogor/git/storage-benchmarking/src/benchmark_output/dataloader-0510 \
 #           --dataset "${storage}"  \
 #           --num_fetch_workers "${num_fetch_workers}" \
 #           --num_workers  "${num_workers}" \
@@ -53,28 +53,44 @@
 #   done
 # done
 
-
 # End2End
-for pin_memory in 0 1; do
-  for fetch_impl in "threaded" "asyncio"; do
-    for storage in "s3" "scratch"; do
-      for batch_size in 16 32 64; do
-        for num_workers in 0 4 8 16; do
-          for num_fetch_workers in 4 8 16 32; do
-            python3 train/imagenet.py --output_base_folder /iarai/home/ivan.svogor/git/storage-benchmarking/src/benchmark_output/e2e \
-            --dataset "${storage}" \
-            --num-fetch-workers "${num_fetch_workers}" \
-            --num-workers "${num_workers}" \
-            --dataset-limit 1024 \
-            --batch-size "${batch_size}" \
-            --prefetch-factor 2 \
-            --fetch-impl "${fetch_impl}" \
-            --pin-memory "${pin_memory}" \
-            --accelerator dp 
-          done
-        done
+# for fetch_impl in "vanilla" "threaded" "asyncio" ; do
+#   for storage in "s3"; do
+#     for batch_size in 128 256 512; do
+#       for num_workers in 0 4 16 32; do
+#         python3 train/imagenet.py --output_base_folder /iarai/home/ivan.svogor/git/storage-benchmarking/src/benchmark_output/e2e1210 \
+#         --dataset "${storage}" \
+#         --num-fetch-workers 32 \
+#         --num-workers "${num_workers}" \
+#         --dataset-limit 50000 \
+#         --batch-size "${batch_size}" \
+#         --prefetch-factor 2 \
+#         --fetch-impl "${fetch_impl}" \
+#         --pin-memory 0 \
+#         --accelerator dp
+#       done
+#     done
+#   done
+# done
+
+for fetch_impl in "vanilla" "threaded" "asyncio" ; do
+  for storage in "s3"; do
+    for batch_size in 128 256 512; do
+      for pre_fetch in 0 2 4; do
+        python3 train/imagenet.py --output_base_folder /iarai/home/ivan.svogor/git/storage-benchmarking/src/benchmark_output/e2e1310 \
+        --dataset "${storage}" \
+        --num-fetch-workers 32 \
+        --num-workers 16 \
+        --dataset-limit 25600 \
+        --batch-size "${batch_size}" \
+        --prefetch-factor "${pre_fetch}" \
+        --fetch-impl "${fetch_impl}" \
+        --pin-memory 0 \
+        --accelerator dp \
+        --num_sanity_val_steps 0
       done
     done
   done
 done
+
 
