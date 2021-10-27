@@ -71,6 +71,10 @@ class ScratchDataset(IndexedDataset):
         image = self.transform(image)
         return image, target, os.path.getsize(image_path)
 
+    def set_device(self, device):
+        pass
+        # self.device = device
+
     def __len__(self) -> int:
         if self.limit is None:
             return len(self.image_paths)

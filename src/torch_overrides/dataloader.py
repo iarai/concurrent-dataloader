@@ -980,45 +980,10 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._shutdown = False
         self._workers_done_event = multiprocessing_context.Event()
 
-        self._index_queues = []
-        self._workers = []
-        for i in range(self._num_workers):
-            # No certainty which module multiprocessing_context is
-            index_queue = multiprocessing_context.Queue()  # type: ignore[var-annotated]
-            # Need to `cancel_join_thread` here!
-            # See sections (2) and (3b) above.
-            index_queue.cancel_join_thread()
-            w = multiprocessing_context.Process(
-                target=_utils.worker._worker_loop,
-                args=(
-                    self._dataset_kind,
-                    self._dataset,
-                    index_queue,
-                    self._worker_result_queue,
-                    self._workers_done_event,
-                    self._auto_collation,
-                    self._collate_fn,
-                    self._drop_last,
-                    self._base_seed,
-                    self._worker_init_fn,
-                    i,
-                    self._num_workers,
-                    self._persistent_workers,
-                    loader.fetch_impl,
-                    loader.num_fetch_workers,
-                    loader.batch_pool,
-                ),
-            )
-            w.daemon = True
-            # NB: Process.start() actually take some time as it needs to
-            #     start a process and pass the arguments over via a pipe.
-            #     Therefore, we only add a worker to self._workers list after
-            #     it started, so that we do not call .join() if program dies
-            #     before it starts, and __del__ tries to join but will get:
-            #     AssertionError: can only join a started process.
-            w.start()
-            self._index_queues.append(index_queue)
-            self._workers.append(w)
+        self.loader = loader
+        self.multiprocessing_context = multiprocessing_context
+
+        self.get_data()
 
         if self._pin_memory:
             self._pin_memory_thread_done_event = threading.Event()
@@ -1047,6 +1012,47 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         _utils.signal_handling._set_SIGCHLD_handler()
         self._worker_pids_set = True
         self._reset(loader, first_iter=True)
+
+    def get_data(self):
+        self._index_queues = []
+        self._workers = []
+        for i in range(self._num_workers):
+            # No certainty which module multiprocessing_context is
+            index_queue = self.multiprocessing_context.Queue()  # type: ignore[var-annotated]
+            # Need to `cancel_join_thread` here!
+            # See sections (2) and (3b) above.
+            index_queue.cancel_join_thread()
+            w = self.multiprocessing_context.Process(
+                target=_utils.worker._worker_loop,
+                args=(
+                    self._dataset_kind,
+                    self._dataset,
+                    index_queue,
+                    self._worker_result_queue,
+                    self._workers_done_event,
+                    self._auto_collation,
+                    self._collate_fn,
+                    self._drop_last,
+                    self._base_seed,
+                    self._worker_init_fn,
+                    i,
+                    self._num_workers,
+                    self._persistent_workers,
+                    self.loader.fetch_impl,
+                    self.loader.num_fetch_workers,
+                    self.loader.batch_pool,
+                ),
+            )
+            w.daemon = True
+            # NB: Process.start() actually take some time as it needs to
+            #     start a process and pass the arguments over via a pipe.
+            #     Therefore, we only add a worker to self._workers list after
+            #     it started, so that we do not call .join() if program dies
+            #     before it starts, and __del__ tries to join but will get:
+            #     AssertionError: can only join a started process.
+            w.start()
+            self._index_queues.append(index_queue)
+            self._workers.append(w)
 
     def _reset(self, loader, first_iter=False):
         super()._reset(loader, first_iter)
@@ -1093,6 +1099,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         #   (bool: whether successfully get data, any: data if successful else None)
         try:
             data = self._data_queue.get(timeout=timeout)
+            # data = self._data_queue.get_nowait()
             return (True, data)
         except Exception as e:
             # At timeout and error, we manually check whether any worker has
@@ -1227,6 +1234,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     # 3. Run the script with the `send` option in the second shell:
     # (shell2) ./test_socket.py sock_tmp 1017 send
 
+    
     def _get_data(self):
         # Fetches data from `self._data_queue`.
         #
@@ -1259,6 +1267,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                 success, data = self._try_get_data()
                 if success:
                     return data
+
 
     def _next_data(self):
         while True:
@@ -1325,10 +1334,12 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             return
 
         self._index_queues[worker_queue_idx].put((self._send_idx, index))
+        # print(f"Putting index: {index} -> worker: {worker_queue_idx}")
         self._task_info[self._send_idx] = (worker_queue_idx,)
         self._tasks_outstanding += 1
         self._send_idx += 1
 
+    # @cached(cache=LFUCache(maxsize=1000))
     def _process_data(self, data):
         self._rcvd_idx += 1
         self._try_put_index()

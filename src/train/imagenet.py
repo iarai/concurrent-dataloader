@@ -13,6 +13,7 @@
 # limitations under the License.
 """This example is largely adapted from
 https://github.com/pytorch/examples/blob/master/imagenet/main.py."""
+import time
 import logging
 from argparse import ArgumentParser
 from argparse import Namespace
@@ -33,10 +34,18 @@ from misc.logging_configuration import initialize_logging
 from misc.time_helper import stopwatch
 from pytorch_lightning.core import LightningModule
 from pytorch_lightning.profiler import AdvancedProfiler
+from pytorch_lightning.profiler import SimpleProfiler
 from torch_overrides.dataloader import DataLoader
 from torch_overrides.worker import _worker_loop
 from pytorch_lightning.callbacks import GPUStatsMonitor
 from pytorch_lightning import loggers as pl_loggers
+
+import pytorch_lightning.loops
+import pytorch_lightning.accelerators
+
+from lightning_overrides import training_epoch_loop
+from lightning_overrides import accelerator
+
 
 class ImageNetLightningModel(LightningModule):
     """
@@ -77,7 +86,7 @@ class ImageNetLightningModel(LightningModule):
     def forward(self, x):
         return self.model(x)
 
-    @stopwatch(trace_name="(6)-training_step", trace_level=6)
+    # @stopwatch(trace_name="(6)-training_step", trace_level=6)
     def training_step(self, batch, batch_idx):
         images, target = batch
         output = self(images)
@@ -88,15 +97,15 @@ class ImageNetLightningModel(LightningModule):
         self.log("train_acc5", acc5, on_step=True, on_epoch=True, logger=True)
         return loss_train
 
-    @stopwatch(trace_name="(7)-validation_step", trace_level=7)
-    def validation_step(self, batch, batch_idx):
-        images, target = batch
-        output = self(images)
-        loss_val = F.cross_entropy(output, target)
-        acc1, acc5 = self.__accuracy(output, target, topk=(1, 5))
-        self.log("val_loss", loss_val, on_step=True, on_epoch=True)
-        self.log("val_acc1", acc1, on_step=True, prog_bar=True, on_epoch=True)
-        self.log("val_acc5", acc5, on_step=True, on_epoch=True)
+    # @stopwatch(trace_name="(7)-validation_step", trace_level=7)
+    # def validation_step(self, batch, batch_idx):
+    #     images, target = batch
+    #     output = self(images)
+    #     loss_val = F.cross_entropy(output, target)
+    #     acc1, acc5 = self.__accuracy(output, target, topk=(1, 5))
+    #     self.log("val_loss", loss_val, on_step=True, on_epoch=True)
+    #     self.log("val_acc1", acc1, on_step=True, prog_bar=True, on_epoch=True)
+    #     self.log("val_acc5", acc5, on_step=True, on_epoch=True)
 
     @staticmethod
     def __accuracy(output, target, topk=(1,)):
@@ -183,13 +192,14 @@ class ImageNetLightningModel(LightningModule):
 
 def main(args: Namespace) -> None:
     # create datasets
-    val_dataset = get_dataset(args.dataset, dataset_type="val", limit=args.dataset_limit)
-    train_dataset = get_dataset(args.dataset, dataset_type="train", limit=args.dataset_limit)
+    val_dataset = get_dataset(args.dataset, dataset_type="val", limit=args.dataset_limit, use_cache=args.use_cache)
+    train_dataset = get_dataset(args.dataset, dataset_type="train", limit=args.dataset_limit, use_cache=args.use_cache)
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     transform = transforms.Compose(
         [transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(), normalize]
     )
+
     val_dataset.set_transform(transform)
     train_dataset.set_transform(transform)
     train_data_loader = DataLoader(
@@ -248,9 +258,13 @@ def main(args: Namespace) -> None:
 
     model = ImageNetLightningModel(train_dataloader=train_data_loader, val_dataloader=None, **vars(args))
     # model = ImageNetLightningModel(train_dataloader=train_data_loader, **vars(args))
+    # val_dataset.set_device(model.device)
+    # train_dataset.set_device(model.device)
+
     tb_logger = pl_loggers.TensorBoardLogger(f"{output_base_folder}/lightning/")
+    profiler = SimpleProfiler(output_filename=f"{output_base_folder}/lightning/{time.time()}.txt")
     trainer = pl.Trainer.from_argparse_args(args,
-                                            profiler="simple",
+                                            profiler=profiler,
                                             logger=tb_logger,
                                             log_every_n_steps=5,
                                             callbacks=[GPUStatsMonitor()])
@@ -267,6 +281,7 @@ def start_train(args, model, trainer):
 
 
 def run_cli():
+    torch.multiprocessing.set_start_method('spawn')# good solution !!!!
     parent_parser = ArgumentParser(add_help=False)
     parent_parser = pl.Trainer.add_argparse_args(parent_parser)
     parent_parser.add_argument("--data-path", metavar="DIR", type=str, help="path to dataset")
@@ -284,6 +299,10 @@ def run_cli():
     parent_parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
     parent_parser.add_argument("--batch-size", type=int, default=4)
     parent_parser.add_argument("--pin-memory", type=int, default=0)
+    parent_parser.add_argument("--use-cache", type=int, default=0)
+
+    pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.advance = training_epoch_loop.TrainingEpochLoop.advance
+    pytorch_lightning.accelerators.accelerator.Accelerator.batch_to_device = accelerator.Accelerator.batch_to_device
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
     # parser.set_defaults(deterministic=True, max_epochs=5)

@@ -16,6 +16,7 @@ from torch.utils.data._utils import HAS_NUMPY
 from torch.utils.data._utils import IS_WINDOWS
 from torch.utils.data._utils import MP_STATUS_CHECK_INTERVAL
 from torch.utils.data._utils import signal_handling
+import torch.cuda
 
 if IS_WINDOWS:
     import ctypes

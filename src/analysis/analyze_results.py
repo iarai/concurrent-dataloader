@@ -7,6 +7,8 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
+import re
+import io
 import humanize
 import matplotlib
 import matplotlib.pyplot as plt
@@ -413,18 +415,36 @@ def extract_pandas(
     return df
 
 
-def extract_gpu_utilization(output_base_folder: Path, folder_filter: str = "**"):
+def extract_gpu_utilization(output_base_folder: Path, folder_filter: str = "**", device_id=0):
     folders = list(output_base_folder.rglob(f"{folder_filter}"))
     files = output_base_folder.rglob(f"{folder_filter}/lightning/default/version_0")
     data = pd.DataFrame()
     for working_file_path in tqdm.tqdm(files, total=len(folders)):
         event_acc = EventAccumulator(str(working_file_path))
         event_acc.Reload()
-        w_times, step_nums, vals = zip(*event_acc.Scalars('device_id: 0/utilization.gpu (%)'))
+        w_times, step_nums, vals = zip(*event_acc.Scalars(f'device_id: {device_id}/utilization.gpu (%)'))
         data = data.append({"run": working_file_path.parent.parent.parent.name,
                             "gpu": np.array(vals),
                             "gpu_mean": np.array(vals).mean(),
                             "gpu_median": np.median(np.array(vals)),
                             "std": np.std(np.array(vals)),
                             }, ignore_index=True)
+    return data
+
+def extract_profiling(output_base_folder: Path, folder_filter: str = "**", device_id=0):
+    folders = list(output_base_folder.rglob(f"{folder_filter}"))
+    files = output_base_folder.rglob(f"{folder_filter}/lightning/*.txt")
+    print(files)
+    data = pd.DataFrame()
+    column_names = ["run", "function", "mean_duration", "num_calls", "total_time", "percentage", "NaN"]
+    for working_file_path in tqdm.tqdm(files, total=len(folders)):
+        with open(working_file_path) as file:
+            lines = file.readlines()
+            lines = [re.sub(r"[\n\t\s]*", "", f"{working_file_path.parent.parent.name}|" + line) for line in lines[6:]]
+            text = "\n".join(lines)
+            data = data.append(pd.read_csv(io.StringIO(text), 
+                                           sep="|", 
+                                           header=None,
+                                           names=column_names))
+    data.drop('NaN', axis=1, inplace=True)
     return data
