@@ -38,7 +38,6 @@ def stopwatch(trace_name, trace_level: int, strip_result: bool = False):
             global_step = -1
             if trace_name == "(6)-training_step":
                 global_step = args[0].global_step
-
             data = {
                 "trace_name": trace_name,
                 "trace_level": trace_level,

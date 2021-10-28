@@ -25,6 +25,9 @@ from pytorch_lightning.utilities.signature_utils import is_param_in_hook_signatu
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 from pytorch_lightning.utilities.warnings import WarningCache
 from misc.time_helper import stopwatch
+import logging
+import json
+import time
 
 class TrainingEpochLoop(loops.Loop):
     """
@@ -117,19 +120,51 @@ class TrainingEpochLoop(loops.Loop):
             StopIteration: When the epoch is canceled by the user returning -1
         """
 
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "next_data",
+            "id": self.global_step,
+            "start_time": time.time()
+        }))
         _, (batch, is_last) = next(dataloader_iter)
         self.is_last_batch = is_last
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "next_data",
+            "id": self.global_step,
+            "end_time": time.time()
+        }))
+
+
         # ------------------------------------
         # TRAINING_STEP + TRAINING_STEP_END
         # ------------------------------------
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "training_batch_to_device",
+            "id": hash(hash(frozenset(batch)) + 1),
+            "start_time": time.time()
+        }))
         with self.trainer.profiler.profile("training_batch_to_device"):
             batch = self.trainer.accelerator.batch_to_device(batch, dataloader_idx=self._dataloader_idx)
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "training_batch_to_device",
+            "id": hash(hash(frozenset(batch)) + 1),
+            "end_time": time.time()
+        }))
 
         self.batch_progress.increment_ready()
 
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "run_training_batch",
+            "id":  hash(frozenset(batch)),
+            "start_time": time.time()
+        }))
         with self.trainer.profiler.profile("run_training_batch"):
             batch_output = self.batch_loop.run(batch, self.iteration_count, self._dataloader_idx)
             self.batches_seen += 1
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "run_training_batch",
+            "id":  hash(frozenset(batch)),
+            "end_time": time.time()
+        }))
 
         self.batch_progress.increment_processed()
 

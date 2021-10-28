@@ -24,3 +24,9 @@ def initialize_logging(output_base_folder: str, loglevel=INFO):
     # https://stackoverflow.com/questions/60196327/python-logging-debug-messages-logged-to-stderr-even-though-handler-level-is-inf
     logging.getLogger("stopwatch").setLevel(logging.DEBUG)
     logging.getLogger("stopwatch").propagate = False
+
+    timeline_log = logging.FileHandler(os.path.join(output_base_folder, f"timeline-{os.getpid()}.log"))
+    timeline_log.setFormatter(logging.Formatter(""))
+    logging.getLogger("timeline").addHandler(timeline_log)
+    logging.getLogger("timeline").setLevel(logging.DEBUG)
+    logging.getLogger("timeline").propagate = False

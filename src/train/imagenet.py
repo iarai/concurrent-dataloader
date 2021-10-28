@@ -234,6 +234,8 @@ def main(args: Namespace) -> None:
                 str(args.batch_size),
                 str(args.num_workers),
                 str(args.num_fetch_workers),
+                str(args.use_cache),
+                str(args.fetch_impl),
                 "sync",
             ]
         ),
@@ -267,7 +269,8 @@ def main(args: Namespace) -> None:
                                             profiler=profiler,
                                             logger=tb_logger,
                                             log_every_n_steps=5,
-                                            callbacks=[GPUStatsMonitor()])
+                                            # callbacks=[GPUStatsMonitor()]
+                                            )
 
     start_train(args, model, trainer)
 
@@ -289,15 +292,15 @@ def run_cli():
         "-e", "--evaluate", dest="evaluate", action="store_true", help="evaluate model on validation set"
     )
     parent_parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
-    parent_parser.add_argument("--fetch-impl", type=str, default="asyncio", help="vanilla | asyncio | threaded")
-    parent_parser.add_argument("--dataset-limit", type=int, default=None)
-    parent_parser.add_argument("--batch-pool", type=int, default=10)
-    parent_parser.add_argument("--num-fetch-workers", type=int, default=10)
-    parent_parser.add_argument("--num-workers", type=int, default=1)
-    parent_parser.add_argument("--prefetch-factor", type=int, default=2)
+    parent_parser.add_argument("--fetch-impl", type=str, default="threaded", help="vanilla | asyncio | threaded")
+    parent_parser.add_argument("--dataset-limit", type=int, default=50)
+    parent_parser.add_argument("--batch-pool", type=int, default=16)
+    parent_parser.add_argument("--num-fetch-workers", type=int, default=16)
+    parent_parser.add_argument("--num-workers", type=int, default=4)
+    parent_parser.add_argument("--prefetch-factor", type=int, default=4)
     parent_parser.add_argument("--dataset", type=str, default="s3", help="s3 | scratch")
     parent_parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
-    parent_parser.add_argument("--batch-size", type=int, default=4)
+    parent_parser.add_argument("--batch-size", type=int, default=10)
     parent_parser.add_argument("--pin-memory", type=int, default=0)
     parent_parser.add_argument("--use-cache", type=int, default=0)
 
@@ -305,8 +308,8 @@ def run_cli():
     pytorch_lightning.accelerators.accelerator.Accelerator.batch_to_device = accelerator.Accelerator.batch_to_device
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
-    # parser.set_defaults(deterministic=True, max_epochs=5)
-    parser.set_defaults(deterministic=True, max_epochs=5, gpus=[2])
+    parser.set_defaults(deterministic=True, max_epochs=5)
+    # parser.set_defaults(deterministic=True, max_epochs=5, gpus=[2])
     args = parser.parse_args()
     main(args)
 
