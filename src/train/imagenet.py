@@ -292,7 +292,7 @@ def run_cli():
         "-e", "--evaluate", dest="evaluate", action="store_true", help="evaluate model on validation set"
     )
     parent_parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
-    parent_parser.add_argument("--fetch-impl", type=str, default="threaded", help="vanilla | asyncio | threaded")
+    parent_parser.add_argument("--fetch-impl", type=str, default="asyncio", help="vanilla | asyncio | threaded")
     parent_parser.add_argument("--dataset-limit", type=int, default=50)
     parent_parser.add_argument("--batch-pool", type=int, default=16)
     parent_parser.add_argument("--num-fetch-workers", type=int, default=16)

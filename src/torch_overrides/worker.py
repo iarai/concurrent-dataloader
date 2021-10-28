@@ -238,9 +238,16 @@ def _worker_loop(
     batch_pool=10,  # number of batches to fetch simultaneously
     initializer=None,
 ):
+
     if initializer is not None:
         initializer()
 
+    d = json.dumps({
+        "item": "setup_worker",
+        "id": hash(index_queue),
+        "start_time": time.time()
+    })
+    logging.getLogger("timeline").debug(d)
     # See NOTE [ Data Loader Multiprocessing Shutdown Logic ] for details on the
     # logic of this function.
     try:
@@ -291,11 +298,18 @@ def _worker_loop(
         # `iteration_end` is set, we skip all processing step and just wait for
         # `None`.
         iteration_end = False
-
+        TIMEOUT = 1
+        d = json.dumps({
+            "item": "setup_worker",
+            "id": hash(index_queue),
+            "end_time": time.time()
+        })
+        logging.getLogger("timeline").debug(d)
         watchdog = ManagerWatchdog()
         while watchdog.is_alive():
             try:
-                r = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
+                # r = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
+                r = index_queue.get(timeout=TIMEOUT)
             except queue.Empty:
                 continue
             if isinstance(r, _ResumeIteration):
@@ -338,7 +352,8 @@ def _worker_loop(
                         # take remaining ones
                         for _ in range(batch_pool):
                             if not index_queue.empty():
-                                current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
+                                # current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
+                                current_batch = index_queue.get(timeout=TIMEOUT)
                                 batch_id, batch_indices = current_batch
                                 batch_sizes[batch_id] = len(batch_indices)
                                 logging.getLogger("timeline").debug(json.dumps({
