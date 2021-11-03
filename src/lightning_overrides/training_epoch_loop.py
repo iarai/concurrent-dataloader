@@ -29,6 +29,7 @@ import logging
 import json
 import time
 
+
 class TrainingEpochLoop(loops.Loop):
     """
     Runs over all batches in a dataloader (one epoch).
@@ -77,7 +78,7 @@ class TrainingEpochLoop(loops.Loop):
         return max_steps_reached or self.trainer.should_stop or self._num_training_batches_reached(self.is_last_batch)
 
     def connect(
-        self, batch_loop: Optional[TrainingBatchLoop] = None, val_loop: Optional["loops.EvaluationLoop"] = None
+            self, batch_loop: Optional[TrainingBatchLoop] = None, val_loop: Optional["loops.EvaluationLoop"] = None
     ) -> None:
         """Optionally connect a custom batch or validation loop to this training epoch loop."""
         if batch_loop is not None:
@@ -133,7 +134,6 @@ class TrainingEpochLoop(loops.Loop):
             "end_time": time.time()
         }))
 
-
         # ------------------------------------
         # TRAINING_STEP + TRAINING_STEP_END
         # ------------------------------------
@@ -152,9 +152,10 @@ class TrainingEpochLoop(loops.Loop):
 
         self.batch_progress.increment_ready()
 
+        print("Training starts.......................")
         logging.getLogger("timeline").debug(json.dumps({
             "item": "run_training_batch",
-            "id":  hash(frozenset(batch)),
+            "id": hash(frozenset(batch)),
             "start_time": time.time()
         }))
         with self.trainer.profiler.profile("run_training_batch"):
@@ -162,10 +163,10 @@ class TrainingEpochLoop(loops.Loop):
             self.batches_seen += 1
         logging.getLogger("timeline").debug(json.dumps({
             "item": "run_training_batch",
-            "id":  hash(frozenset(batch)),
+            "id": hash(frozenset(batch)),
             "end_time": time.time()
         }))
-
+        print("Loop done...")
         self.batch_progress.increment_processed()
 
         # when returning -1 from train_step, we end epoch early
@@ -340,7 +341,7 @@ class TrainingEpochLoop(loops.Loop):
         return self.batches_seen == self.trainer.num_training_batches or is_last_batch
 
     def _track_epoch_end_reduce_metrics(
-        self, epoch_output: List[List[STEP_OUTPUT]], batch_end_outputs: STEP_OUTPUT
+            self, epoch_output: List[List[STEP_OUTPUT]], batch_end_outputs: STEP_OUTPUT
     ) -> None:
         """Adds the batch outputs to the epoch outputs and prepares reduction"""
         hook_overridden = self._should_add_batch_output_to_epoch_output()
@@ -375,7 +376,7 @@ class TrainingEpochLoop(loops.Loop):
 
     @staticmethod
     def _prepare_outputs(
-        outputs: List[List[List["ResultCollection"]]], batch_mode: bool
+            outputs: List[List[List["ResultCollection"]]], batch_mode: bool
     ) -> Union[List[List[List[Dict]]], List[List[Dict]], List[Dict], Dict]:
         """
         Extract required information from batch or epoch end results.

@@ -6,6 +6,7 @@ static methods.
 import os
 import queue
 import random
+import threading
 from dataclasses import dataclass
 from typing import Union
 
@@ -238,16 +239,10 @@ def _worker_loop(
     batch_pool=10,  # number of batches to fetch simultaneously
     initializer=None,
 ):
-
     if initializer is not None:
         initializer()
 
-    d = json.dumps({
-        "item": "setup_worker",
-        "id": hash(index_queue),
-        "start_time": time.time()
-    })
-    logging.getLogger("timeline").debug(d)
+
     # See NOTE [ Data Loader Multiprocessing Shutdown Logic ] for details on the
     # logic of this function.
     try:
@@ -299,17 +294,12 @@ def _worker_loop(
         # `None`.
         iteration_end = False
         TIMEOUT = 1
-        d = json.dumps({
-            "item": "setup_worker",
-            "id": hash(index_queue),
-            "end_time": time.time()
-        })
-        logging.getLogger("timeline").debug(d)
         watchdog = ManagerWatchdog()
         while watchdog.is_alive():
             try:
                 # r = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
                 r = index_queue.get(timeout=TIMEOUT)
+                print(f"Checking out index queue {threading.get_ident()}........................ {r}, {index_queue}")
             except queue.Empty:
                 continue
             if isinstance(r, _ResumeIteration):
@@ -401,6 +391,7 @@ def _worker_loop(
                         # See NOTE [ Python Traceback Reference Cycle Problem ]
                         data = ExceptionWrapper(where="in DataLoader worker process {}".format(worker_id))
             if fetch_impl != "threaded":
+                print(f"Putting (done?): {idx}")
                 data_queue.put((idx, data))
                 del data
             del idx, index, r  # save memory
@@ -410,3 +401,4 @@ def _worker_loop(
     if done_event.is_set():
         data_queue.cancel_join_thread()
         data_queue.close()
+    print(f"Worker {worker_id} done!")

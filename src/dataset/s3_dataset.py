@@ -113,6 +113,7 @@ class S3Dataset(IndexedDataset):
             https://github.com/pytorch/vision/blob/7947fc8fb38b1d3a2aca03f22a2e6a3caa63f2a0/torchvision/datasets/folder.py#L229
                 - target is class_index of the target class
         """
+        # print(f"Downloading {index}")
         class_folder_name = self.image_paths[index].split("/")[3]
         if self.classes is not None:
             # validation dataset

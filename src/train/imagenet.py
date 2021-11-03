@@ -45,6 +45,8 @@ import pytorch_lightning.accelerators
 
 from lightning_overrides import training_epoch_loop
 from lightning_overrides import accelerator
+from lightning_overrides import training_batch_loop
+from lightning_overrides import precision_plugin
 
 
 class ImageNetLightningModel(LightningModule):
@@ -89,12 +91,14 @@ class ImageNetLightningModel(LightningModule):
     # @stopwatch(trace_name="(6)-training_step", trace_level=6)
     def training_step(self, batch, batch_idx):
         images, target = batch
+        print("In trainer step...")
         output = self(images)
         loss_train = F.cross_entropy(output, target)
         acc1, acc5 = self.__accuracy(output, target, topk=(1, 5))
         self.log("train_loss", loss_train, on_step=True, on_epoch=True, logger=True)
         self.log("train_acc1", acc1, on_step=True, prog_bar=True, on_epoch=True, logger=True)
         self.log("train_acc5", acc5, on_step=True, on_epoch=True, logger=True)
+        print("Step done")
         return loss_train
 
     # @stopwatch(trace_name="(7)-validation_step", trace_level=7)
@@ -284,7 +288,7 @@ def start_train(args, model, trainer):
 
 
 def run_cli():
-    torch.multiprocessing.set_start_method('spawn')# good solution !!!!
+    torch.multiprocessing.set_start_method('spawn')  # good solution !!!!
     parent_parser = ArgumentParser(add_help=False)
     parent_parser = pl.Trainer.add_argparse_args(parent_parser)
     parent_parser.add_argument("--data-path", metavar="DIR", type=str, help="path to dataset")
@@ -292,23 +296,30 @@ def run_cli():
         "-e", "--evaluate", dest="evaluate", action="store_true", help="evaluate model on validation set"
     )
     parent_parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
-    parent_parser.add_argument("--fetch-impl", type=str, default="asyncio", help="vanilla | asyncio | threaded")
-    parent_parser.add_argument("--dataset-limit", type=int, default=50)
+    parent_parser.add_argument("--fetch-impl", type=str, default="vanilla", help="vanilla | asyncio | threaded")
+    parent_parser.add_argument("--dataset-limit", type=int, default=20)
     parent_parser.add_argument("--batch-pool", type=int, default=16)
     parent_parser.add_argument("--num-fetch-workers", type=int, default=16)
-    parent_parser.add_argument("--num-workers", type=int, default=4)
+    parent_parser.add_argument("--num-workers", type=int, default=2)
     parent_parser.add_argument("--prefetch-factor", type=int, default=4)
     parent_parser.add_argument("--dataset", type=str, default="s3", help="s3 | scratch")
     parent_parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
-    parent_parser.add_argument("--batch-size", type=int, default=10)
+    parent_parser.add_argument("--batch-size", type=int, default=4)
     parent_parser.add_argument("--pin-memory", type=int, default=0)
     parent_parser.add_argument("--use-cache", type=int, default=0)
 
     pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.advance = training_epoch_loop.TrainingEpochLoop.advance
+    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop._training_step = training_batch_loop.TrainingBatchLoop._training_step
+    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop.training_step_and_backward = training_batch_loop.TrainingBatchLoop.training_step_and_backward
+    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop._training_step_and_backward_closure = training_batch_loop.TrainingBatchLoop._training_step_and_backward_closure
+    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop.backward = training_batch_loop.TrainingBatchLoop.backward
     pytorch_lightning.accelerators.accelerator.Accelerator.batch_to_device = accelerator.Accelerator.batch_to_device
+    pytorch_lightning.accelerators.accelerator.Accelerator.training_step = accelerator.Accelerator.training_step
+    pytorch_lightning.accelerators.accelerator.Accelerator.backward = accelerator.Accelerator.backward
+    pytorch_lightning.plugins.precision.precision_plugin.PrecisionPlugin.backward = precision_plugin.PrecisionPlugin.backward
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
-    parser.set_defaults(deterministic=True, max_epochs=5)
+    parser.set_defaults(deterministic=True, max_epochs=3)
     # parser.set_defaults(deterministic=True, max_epochs=5, gpus=[2])
     args = parser.parse_args()
     main(args)
