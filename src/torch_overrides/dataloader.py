@@ -12,6 +12,7 @@ from multiprocessing import Pool
 import os
 # import queue
 from torch.multiprocessing import queue  # works slightly better
+from queue import Empty
 import threading
 import warnings
 from typing import Any
@@ -370,7 +371,9 @@ class DataLoader(Generic[T_co]):
             return _SingleProcessDataLoaderIter(self)
         else:
             self.check_worker_number_rationality()
-            return _MultiProcessingDataLoaderIter(self)
+            iter = _MultiProcessingDataLoaderIter(self)
+            # iter.start_data_download()
+            return iter
 
     @property
     def multiprocessing_context(self):
@@ -436,11 +439,14 @@ class DataLoader(Generic[T_co]):
         # However, in the case of a multiple workers iterator
         # the iterator is only created once in the lifetime of the
         # DataLoader object so that workers can be reused
+
+        # coming from next in advance
         if self.persistent_workers and self.num_workers > 0:
             if self._iterator is None:
                 self._iterator = self._get_iterator()
             else:
                 self._iterator._reset(self)
+                # returning iterator
             return self._iterator
         else:
             return self._get_iterator()
@@ -598,7 +604,12 @@ class _BaseDataLoaderIter(object):
     def _next_data(self):
         raise NotImplementedError
 
+    def start_download(self):
+        raise NotImplementedError
+
     def __next__(self) -> Any:
+        self.start_download()
+
         with torch.autograd.profiler.record_function(self._profile_name):
             if self._sampler_iter is None:
                 self._reset()
@@ -981,18 +992,20 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #     processing indices already in `index_queue` if we are already shutting
     #     down.
 
+
+
     def __init__(self, loader):
         super(_MultiProcessingDataLoaderIter, self).__init__(loader)
         assert self._num_workers > 0
         assert self._prefetch_factor > 0
 
-        print("Init done 1")
+        self.download_in_progress = False
+
         if loader.multiprocessing_context is None:
             multiprocessing_context = multiprocessing
         else:
             multiprocessing_context = loader.multiprocessing_context
 
-        print("Init done 2")
         self._worker_init_fn = loader.worker_init_fn
         self._worker_queue_idx_cycle = itertools.cycle(range(self._num_workers))
         # No certainty which module multiprocessing_context is
@@ -1004,7 +1017,6 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self.loader = loader
         self.multiprocessing_context = multiprocessing_context
 
-        print("Init done 3")
         self._workers = []
         self._index_queues = []
         self._task_info = {}
@@ -1013,12 +1025,16 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._workers_status = [False for i in range(self._num_workers)]
         self._tasks_outstanding = 0
 
-        for _ in self.get_data():
-            print("Init done 4")
+        #self.start_data_download()
 
+    def start_download(self):
+        print("Starting to download...............")
+        self.start_data_download()
+
+    def start_data_download(self):
+        for _ in self.get_data():
             if self._pin_memory:
                 self._pin_memory_thread_done_event = threading.Event()
-
                 # Queue is not type-annotated
                 self._data_queue = queue.Queue()  # type: ignore[var-annotated]
                 pin_memory_thread = threading.Thread(
@@ -1036,31 +1052,16 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                 # pin_memory_thread once it is started.
                 self._pin_memory_thread = pin_memory_thread
             else:
-                # d = json.dumps({
-                #     "item": "setup_worker",
-                #     "id": hash(index_queue),
-                #     "start_time": time.time()
-                # })
-                # logging.getLogger("timeline").debug(d)
                 self._data_queue = self._worker_result_queue
-                # d = json.dumps({
-                #     "item": "setup_worker",
-                #     "id": hash(index_queue),
-                #     "end_time": time.time()
-                # })
-                # logging.getLogger("timeline").debug(d)
-            # .pid can be None only before process is spawned (not the case, so ignore)
-            # _utils.signal_handling._set_worker_pids(id(self), tuple(w.pid for w in self._workers))  # type: ignore[misc]
-            # _utils.signal_handling._set_SIGCHLD_handler()
-            # self._worker_pids_set = True
             self._worker_pids_set = False
             # self._reset(loader, first_iter=True)
-            print("Init done 5")
-            # self.worker_id = 0
+            # yield
 
     def get_data(self):
         print(f"Get data starts for... {self._num_workers} workers")
-
+        if self.download_in_progress:
+            return
+        self.download_in_progress = True
         for i in range(self._num_workers):
             # No certainty which module multiprocessing_context is
             index_queue = self.multiprocessing_context.Queue()  # type: ignore[var-annotated]
@@ -1168,7 +1169,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             if len(failed_workers) > 0:
                 pids_str = ", ".join(str(w.pid) for w in failed_workers)
                 raise RuntimeError("DataLoader worker (pid(s) {}) exited unexpectedly".format(pids_str)) from e
-            if isinstance(e, queue.Empty):
+            if isinstance(e, Empty):
                 return (False, None)
             import tempfile
             import errno
@@ -1389,13 +1390,11 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._send_idx += 1
 
     def _try_put_index(self):
-        print("Trying to put index 1")
         assert self._tasks_outstanding < self._prefetch_factor * self._num_workers
 
         try:
             index = self._next_index()
         except StopIteration:
-            print("Trying to put index 2")
             return
         for _ in range(self._num_workers):  # find the next active worker, if any
             worker_queue_idx = next(self._worker_queue_idx_cycle)
@@ -1403,7 +1402,6 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                 break
         else:
             # not found (i.e., didn't break)
-            print("Trying to put index 3")
             return
         self._index_queues[worker_queue_idx].put((self._send_idx, index))
         # print(f"Putting index: {index} -> worker: {worker_queue_idx}")
@@ -1412,7 +1410,6 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._send_idx += 1
 
 
-    # @cached(cache=LFUCache(maxsize=1000))
     def _process_data(self, data):
         self._rcvd_idx += 1
         self._try_put_index()

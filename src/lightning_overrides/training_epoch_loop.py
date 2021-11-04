@@ -110,6 +110,7 @@ class TrainingEpochLoop(loops.Loop):
         self.trainer.call_hook("on_train_epoch_start")
         self.trainer.fit_loop.epoch_progress.increment_started()
 
+    import time
     @stopwatch(trace_name="(6)-advance", trace_level=6)
     def advance(self, dataloader_iter: Iterator, **kwargs: Any) -> None:
         """Runs a single training batch.
@@ -126,8 +127,19 @@ class TrainingEpochLoop(loops.Loop):
             "id": self.global_step,
             "start_time": time.time()
         }))
-        _, (batch, is_last) = next(dataloader_iter)
-        self.is_last_batch = is_last
+
+        #dataloader_iter.start_data_download()
+
+        while True:
+            _, (batch, is_last) = next(dataloader_iter)
+            self.is_last_batch = is_last
+            if batch is None:
+                print("Waiting for first batch...")
+                time.sleep(1)
+            else:
+                print(f"Batch is here... {self.batch_idx}, {self._dataloader_idx}")
+                break
+
         logging.getLogger("timeline").debug(json.dumps({
             "item": "next_data",
             "id": self.global_step,
