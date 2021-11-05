@@ -128,17 +128,8 @@ class TrainingEpochLoop(loops.Loop):
             "start_time": time.time()
         }))
 
-        #dataloader_iter.start_data_download()
-
-        while True:
-            _, (batch, is_last) = next(dataloader_iter)
-            self.is_last_batch = is_last
-            if batch is None:
-                print("Waiting for first batch...")
-                time.sleep(1)
-            else:
-                print(f"Batch is here... {self.batch_idx}, {self._dataloader_idx}")
-                break
+        _, (batch, is_last) = next(dataloader_iter)
+        self.is_last_batch = is_last
 
         logging.getLogger("timeline").debug(json.dumps({
             "item": "next_data",

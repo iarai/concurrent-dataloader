@@ -191,9 +191,7 @@ class Accelerator:
                 - hiddens(:class:`~torch.Tensor`): Passed in if
                   :paramref:`~pytorch_lightning.core.lightning.LightningModule.truncated_bptt_steps` > 0.
         """
-        print("Training step")
         with self.precision_plugin.train_step_context(), self.training_type_plugin.train_step_context():
-            print("Return?")
             return self.training_type_plugin.training_step(*step_kwargs.values())
 
     def post_training_step(self) -> None:
@@ -274,18 +272,12 @@ class Accelerator:
         Args:
             closure_loss: a tensor holding the loss value to backpropagate
         """
-        print("BW...1")
         self.training_type_plugin.pre_backward(closure_loss)
-        print("BW...2")
         closure_loss = self.precision_plugin.pre_backward(self.lightning_module, closure_loss)
-        print("BW...3")
 
         self.precision_plugin.backward(self.lightning_module, closure_loss, *args, **kwargs)
-        print("BW...4")
         closure_loss = self.precision_plugin.post_backward(self.lightning_module, closure_loss)
-        print("BW...5")
         self.training_type_plugin.post_backward(closure_loss)
-        print("BW...6")
 
         return closure_loss
 

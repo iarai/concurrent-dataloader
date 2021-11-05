@@ -10,8 +10,8 @@ import multiprocessing as python_multiprocessing
 # from ray.util.multiprocessing import Pool
 from multiprocessing import Pool
 import os
-# import queue
-from torch.multiprocessing import queue  # works slightly better
+import queue
+# from torch.multiprocessing import queue  # works slightly better
 from queue import Empty
 import threading
 import warnings
@@ -603,12 +603,7 @@ class _BaseDataLoaderIter(object):
     def _next_data(self):
         raise NotImplementedError
 
-    def start_download(self):
-        raise NotImplementedError
-
     def __next__(self) -> Any:
-        self.start_download()
-
         with torch.autograd.profiler.record_function(self._profile_name):
             if self._sampler_iter is None:
                 self._reset()
@@ -992,10 +987,10 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #     down.
     def __init__(self, loader):
         super(_MultiProcessingDataLoaderIter, self).__init__(loader)
+
         assert self._num_workers > 0
         assert self._prefetch_factor > 0
-
-        self.download_in_progress = False
+        self.loader = loader
 
         if loader.multiprocessing_context is None:
             multiprocessing_context = multiprocessing
@@ -1010,62 +1005,15 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._shutdown = False
         self._workers_done_event = multiprocessing_context.Event()
 
-        self.loader = loader
-        self.multiprocessing_context = multiprocessing_context
-
-        self._workers = []
         self._index_queues = []
-        self._task_info = {}
-        self._send_idx = 0
-        self._rcvd_idx = 0
-        self._workers_status = [False for i in range(self._num_workers)]
-        self._tasks_outstanding = 0
-
-        self.start_data_download()
-
-    def start_download(self):
-        self.start_data_download()
-
-    def start_data_download(self):
-        for _ in self.get_data():
-            if self._pin_memory:
-                self._pin_memory_thread_done_event = threading.Event()
-                # Queue is not type-annotated
-                self._data_queue = queue.Queue()  # type: ignore[var-annotated]
-                pin_memory_thread = threading.Thread(
-                    target=_utils.pin_memory._pin_memory_loop,
-                    args=(
-                        self._worker_result_queue,
-                        self._data_queue,
-                        torch.cuda.current_device(),
-                        self._pin_memory_thread_done_event,
-                    ),
-                )
-                pin_memory_thread.daemon = True
-                pin_memory_thread.start()
-                # Similar to workers (see comment above), we only register
-                # pin_memory_thread once it is started.
-                self._pin_memory_thread = pin_memory_thread
-            else:
-                self._data_queue = self._worker_result_queue
-            self._worker_pids_set = False
-            # self._reset(loader, first_iter=True)
-            # yield
-
-    def get_data(self):
-        print(f"Get data starts for... {self._num_workers} workers")
-        if self.download_in_progress:
-            return
-        self.download_in_progress = True
+        self._workers = []
         for i in range(self._num_workers):
             # No certainty which module multiprocessing_context is
-            index_queue = self.multiprocessing_context.Queue()  # type: ignore[var-annotated]
+            index_queue = multiprocessing_context.Queue()  # type: ignore[var-annotated]
             # Need to `cancel_join_thread` here!
             # See sections (2) and (3b) above.
             index_queue.cancel_join_thread()
-            print(f"Creating process {i}")
-            # this is slow!
-            w = self.multiprocessing_context.Process(
+            w = multiprocessing_context.Process(
                 target=_utils.worker._worker_loop,
                 args=(
                     self._dataset_kind,
@@ -1084,9 +1032,20 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                     self.loader.fetch_impl,
                     self.loader.num_fetch_workers,
                     self.loader.batch_pool,
-                ),
-            )
-            print(f"Creating process done {i}")
+                      # self._dataset_kind,
+                      # self._dataset,
+                      # index_queue,
+                      # self._worker_result_queue,
+                      # self._workers_done_event,
+                      # self._auto_collation,
+                      # self._collate_fn,
+                      # self._drop_last,
+                      # self._base_seed,
+                      # self._worker_init_fn,
+                      # i,
+                      # self._num_workers,
+                      # self._persistent_workers
+                      ))
             w.daemon = True
             # NB: Process.start() actually take some time as it needs to
             #     start a process and pass the arguments over via a pipe.
@@ -1097,11 +1056,30 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             w.start()
             self._index_queues.append(index_queue)
             self._workers.append(w)
-            self._try_prime_index(w, i)
-            yield self._workers
-        # this blocks until the processes are complete
-        print(f"Done getting data with {i} processes! "
-              f"Index queue: {len(self._index_queues)}, workers: {len(self._workers)}")
+
+        if self._pin_memory:
+            self._pin_memory_thread_done_event = threading.Event()
+
+            # Queue is not type-annotated
+            self._data_queue = queue.Queue()  # type: ignore[var-annotated]
+            pin_memory_thread = threading.Thread(
+                target=_utils.pin_memory._pin_memory_loop,
+                args=(self._worker_result_queue, self._data_queue,
+                      torch.cuda.current_device(),
+                      self._pin_memory_thread_done_event))
+            pin_memory_thread.daemon = True
+            pin_memory_thread.start()
+            # Similar to workers (see comment above), we only register
+            # pin_memory_thread once it is started.
+            self._pin_memory_thread = pin_memory_thread
+        else:
+            self._data_queue = self._worker_result_queue
+
+        # .pid can be None only before process is spawned (not the case, so ignore)
+        _utils.signal_handling._set_worker_pids(id(self), tuple(w.pid for w in self._workers))  # type: ignore[misc]
+        _utils.signal_handling._set_SIGCHLD_handler()
+        self._worker_pids_set = True
+        self._reset(loader, first_iter=True)
 
     def _reset(self, loader, first_iter=False):
         super()._reset(loader, first_iter)
@@ -1147,10 +1125,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         # Returns a 2-tuple:
         #   (bool: whether successfully get data, any: data if successful else None)
         try:
-            print("\nGetting data")
             data = self._data_queue.get(timeout=timeout)
-            print("Getting here...")
-            # data = self._data_queue.get_nowait()
             return (True, data)
         except Exception as e:
             # At timeout and error, we manually check whether any worker has
@@ -1162,42 +1137,40 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                     failed_workers.append(w)
                     self._mark_worker_as_unavailable(worker_id)
             if len(failed_workers) > 0:
-                pids_str = ", ".join(str(w.pid) for w in failed_workers)
-                raise RuntimeError("DataLoader worker (pid(s) {}) exited unexpectedly".format(pids_str)) from e
-            if isinstance(e, Empty):
+                pids_str = ', '.join(str(w.pid) for w in failed_workers)
+                raise RuntimeError('DataLoader worker (pid(s) {}) exited unexpectedly'.format(pids_str)) from e
+            if isinstance(e, queue.Empty):
                 return (False, None)
             import tempfile
             import errno
-
             try:
                 # Raise an exception if we are this close to the FDs limit.
                 # Apparently, trying to open only one file is not a sufficient
                 # test.
-                # See NOTE [ DataLoader on Linux and open image_paths limit ]
+                # See NOTE [ DataLoader on Linux and open files limit ]
                 fds_limit_margin = 10
                 fs = [tempfile.NamedTemporaryFile() for i in range(fds_limit_margin)]
             except OSError as e:
                 if e.errno == errno.EMFILE:
                     raise RuntimeError(
-                        "Too many open image_paths. Communication with the"
+                        "Too many open files. Communication with the"
                         " workers is no longer possible. Please increase the"
                         " limit using `ulimit -n` in the shell or change the"
                         " sharing strategy by calling"
                         " `torch.multiprocessing.set_sharing_strategy('file_system')`"
-                        " at the beginning of your code"
-                    ) from None
+                        " at the beginning of your code") from None
             raise
 
-    # NOTE [ DataLoader on Linux and open image_paths limit ]
+    # NOTE [ DataLoader on Linux and open files limit ]
     #
     # On Linux when DataLoader is used with multiprocessing we pass the data between
-    # the root process and the workers through SHM image_paths. We remove those image_paths from
+    # the root process and the workers through SHM files. We remove those files from
     # the filesystem as soon as they are created and keep them alive by
     # passing around their file descriptors through AF_UNIX sockets. (See
     # docs/source/multiprocessing.rst and 'Multiprocessing Technical Notes` in
     # the wiki (https://github.com/pytorch/pytorch/wiki).)
     #
-    # This sometimes leads us to exceeding the open image_paths limit. When that happens,
+    # This sometimes leads us to exceeding the open files limit. When that happens,
     # and the offending file descriptor is coming over a socket, the `socket` Python
     # package silently strips the file descriptor from the message, setting only the
     # `MSG_CTRUNC` flag (which might be a bit misleading since the manpage says that
@@ -1212,7 +1185,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     # `torch.multiprocessing`) raises a `RuntimeError: received 0 items of ancdata`
     #
     # Sometimes, instead of the FD being stripped, you may get an `OSError:
-    # Too many open image_paths`, both in the script below and in DataLoader. However,
+    # Too many open files`, both in the script below and in DataLoader. However,
     # this is rare and seems to be nondeterministic.
     #
     #
@@ -1226,7 +1199,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #
     #
     #   if len(sys.argv) != 4:
-    #       logging.info("Usage: ", sys.argv[0], " tmp_dirname iteration (send|recv)")
+    #       print("Usage: ", sys.argv[0], " tmp_dirname iteration (send|recv)")
     #       sys.exit(1)
     #
     #   if __name__ == '__main__':
@@ -1246,7 +1219,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #               fd = os.open(dummy_path(i), os.O_WRONLY | os.O_CREAT)
     #               ancdata = array.array('i', [fd])
     #               msg = bytes([i % 256])
-    #               logging.info("Sending fd ", fd, " (iteration #", i, ")")
+    #               print("Sending fd ", fd, " (iteration #", i, ")")
     #               client.sendmsg([msg], [(socket.SOL_SOCKET, socket.SCM_RIGHTS, ancdata)])
     #
     #
@@ -1258,18 +1231,18 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #
     #           os.mkdir(dirname)
     #
-    #           logging.info("Opening socket...")
+    #           print("Opening socket...")
     #           server = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
     #           server.bind(sock_path)
     #
-    #           logging.info("Listening...")
+    #           print("Listening...")
     #           for i in range(iterations):
     #               a = array.array('i')
     #               msg, ancdata, flags, addr = server.recvmsg(1, socket.CMSG_SPACE(a.itemsize))
     #               assert(len(ancdata) == 1)
     #               cmsg_level, cmsg_type, cmsg_data = ancdata[0]
     #               a.frombytes(cmsg_data)
-    #               logging.info("Received fd ", a[0], " (iteration #", i, ")")
+    #               print("Received fd ", a[0], " (iteration #", i, ")")
     #
     #           shutil.rmtree(dirname)
     #
@@ -1301,7 +1274,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             if success:
                 return data
             else:
-                raise RuntimeError("DataLoader timed out after {} seconds".format(self._timeout))
+                raise RuntimeError('DataLoader timed out after {} seconds'.format(self._timeout))
         elif self._pin_memory:
             while self._pin_memory_thread.is_alive():
                 success, data = self._try_get_data()
@@ -1309,7 +1282,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                     return data
             else:
                 # while condition is false, i.e., pin_memory_thread died.
-                raise RuntimeError("Pin memory thread exited unexpectedly")
+                raise RuntimeError('Pin memory thread exited unexpectedly')
             # In this case, `self._data_queue` is a `queue.Queue`,. But we don't
             # need to call `.task_done()` because we don't use `.join()`.
         else:
@@ -1367,25 +1340,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                 del self._task_info[idx]
                 return self._process_data(data)
 
-    def _try_prime_index(self, worker, id):
-        # print(f"Outstanding tasks: {self._tasks_outstanding}")
-        # assert self._tasks_outstanding < self._prefetch_factor * self._num_workers
-        try:
-            index = self._next_index()
-            print(f"Index: {index}")
-        except StopIteration:
-            return
-        print(f"Workers: {self._num_workers}")
-        worker_queue_idx = id
-        print(f"Putting index: {index} -> worker: {worker_queue_idx}")
-        self._workers_status[id] = True
-        self._index_queues[worker_queue_idx].put((self._send_idx, index))
-        self._task_info[self._send_idx] = (worker_queue_idx,)
-        self._tasks_outstanding += 1
-        self._send_idx += 1
-
     def _try_put_index(self):
-        return
         assert self._tasks_outstanding < self._prefetch_factor * self._num_workers
 
         try:
@@ -1399,12 +1354,11 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         else:
             # not found (i.e., didn't break)
             return
+
         self._index_queues[worker_queue_idx].put((self._send_idx, index))
-        # print(f"Putting index: {index} -> worker: {worker_queue_idx}")
         self._task_info[self._send_idx] = (worker_queue_idx,)
         self._tasks_outstanding += 1
         self._send_idx += 1
-
 
     def _process_data(self, data):
         self._rcvd_idx += 1
@@ -1458,7 +1412,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                 # Exit `pin_memory_thread` first because exiting workers may leave
                 # corrupted data in `worker_result_queue` which `pin_memory_thread`
                 # reads from.
-                if hasattr(self, "_pin_memory_thread"):
+                if hasattr(self, '_pin_memory_thread'):
                     # Use hasattr in case error happens before we set the attribute.
                     self._pin_memory_thread_done_event.set()
                     # Send something to pin_memory_thread in case it is waiting

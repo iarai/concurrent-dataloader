@@ -22,11 +22,16 @@ import torchvision.models as models
 from functools import partial
 import logging
 from misc.logging_configuration import initialize_logging
-from torch_overrides.dataloader import DataLoader
+
+# from torch_overrides.dataloader import DataLoader
+# from torch_overrides.worker import _worker_loop
+#
+from torch_overrides_vanilla.dataloader import DataLoader
+from torch_overrides_vanilla.worker import _worker_loop
+
 from main import get_dataset
 from main import init_benchmarking
 from pathlib import Path
-from torch_overrides.worker import _worker_loop
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")

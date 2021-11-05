@@ -33,10 +33,14 @@ from main import init_benchmarking
 from misc.logging_configuration import initialize_logging
 from misc.time_helper import stopwatch
 from pytorch_lightning.core import LightningModule
-from pytorch_lightning.profiler import AdvancedProfiler
 from pytorch_lightning.profiler import SimpleProfiler
+
 from torch_overrides.dataloader import DataLoader
 from torch_overrides.worker import _worker_loop
+
+# from torch_overrides_vanilla.dataloader import DataLoader
+# from torch_overrides_vanilla.worker import _worker_loop
+
 from pytorch_lightning.callbacks import GPUStatsMonitor
 from pytorch_lightning import loggers as pl_loggers
 
@@ -217,17 +221,17 @@ def main(args: Namespace) -> None:
         batch_pool=args.batch_pool,
         pin_memory=args.pin_memory,
     )
-    val_data_loader = DataLoader(
-        dataset=val_dataset,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        shuffle=False,
-        prefetch_factor=args.prefetch_factor,
-        num_fetch_workers=args.num_fetch_workers,
-        fetch_impl=args.fetch_impl,
-        batch_pool=args.batch_pool,
-        pin_memory=args.pin_memory,
-    )
+    # val_data_loader = DataLoader(
+    #     dataset=val_dataset,
+    #     batch_size=args.batch_size,
+    #     num_workers=args.num_workers,
+    #     shuffle=False,
+    #     prefetch_factor=args.prefetch_factor,
+    #     num_fetch_workers=args.num_fetch_workers,
+    #     fetch_impl=args.fetch_impl,
+    #     batch_pool=args.batch_pool,
+    #     pin_memory=args.pin_memory,
+    # )
 
     output_base_folder = init_benchmarking(
         args=args,
@@ -297,14 +301,14 @@ def run_cli():
     )
     parent_parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
     parent_parser.add_argument("--fetch-impl", type=str, default="vanilla", help="vanilla | asyncio | threaded")
-    parent_parser.add_argument("--dataset-limit", type=int, default=20)
+    parent_parser.add_argument("--dataset-limit", type=int, default=60)
     parent_parser.add_argument("--batch-pool", type=int, default=16)
     parent_parser.add_argument("--num-fetch-workers", type=int, default=16)
-    parent_parser.add_argument("--num-workers", type=int, default=2)
+    parent_parser.add_argument("--num-workers", type=int, default=4)
     parent_parser.add_argument("--prefetch-factor", type=int, default=4)
     parent_parser.add_argument("--dataset", type=str, default="s3", help="s3 | scratch")
     parent_parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
-    parent_parser.add_argument("--batch-size", type=int, default=4)
+    parent_parser.add_argument("--batch-size", type=int, default=20)
     parent_parser.add_argument("--pin-memory", type=int, default=0)
     parent_parser.add_argument("--use-cache", type=int, default=0)
 
