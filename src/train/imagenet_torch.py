@@ -23,11 +23,11 @@ from functools import partial
 import logging
 from misc.logging_configuration import initialize_logging
 
-# from torch_overrides.dataloader import DataLoader
-# from torch_overrides.worker import _worker_loop
+from torch_overrides.dataloader import DataLoader
+from torch_overrides.worker import _worker_loop
 #
-from torch_overrides_vanilla.dataloader import DataLoader
-from torch_overrides_vanilla.worker import _worker_loop
+# from torch_overrides_vanilla.dataloader import DataLoader
+# from torch_overrides_vanilla.worker import _worker_loop
 
 from main import get_dataset
 from main import init_benchmarking
@@ -91,7 +91,7 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'multi node data parallel training')
 
 parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
-parser.add_argument("--fetch-impl", type=str, default="vanilla", help="vanilla | asyncio | threaded")
+parser.add_argument("--fetch-impl", type=str, default="threaded", help="vanilla | asyncio | threaded")
 parser.add_argument("--dataset-limit", type=int, default=50)
 parser.add_argument("--num-fetch-workers", type=int, default=16)
 parser.add_argument("--prefetch-factor", type=int, default=2)

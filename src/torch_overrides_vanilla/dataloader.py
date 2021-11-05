@@ -7,13 +7,8 @@ in `./_utils/worker.py`.
 import itertools
 import logging
 import multiprocessing as python_multiprocessing
-# from ray.util.multiprocessing import Pool
-from multiprocessing import Pool
 import os
 import queue
-# from torch.multiprocessing import queue  # works slightly better
-from queue import Empty
-import threading
 import warnings
 from typing import Any
 from typing import Callable
@@ -21,14 +16,11 @@ from typing import Generic
 from typing import List
 from typing import Optional
 from typing import Sequence
-from typing import Type
 from typing import TypeVar
 import time
 import logging
 import json
 import threading
-import concurrent
-from concurrent.futures import ThreadPoolExecutor
 import torch
 import torch.multiprocessing as multiprocessing
 from torch._six import string_classes
@@ -40,11 +32,9 @@ from torch.utils.data import IterableDataset
 from torch.utils.data import RandomSampler
 from torch.utils.data import Sampler
 from torch.utils.data import SequentialSampler
-from torch_overrides.fetch import _AsyncMapDatasetFetcher
-from torch_overrides.fetch import _IterableDatasetFetcher
-from torch_overrides.fetch import _MapDatasetFetcher
-from torch_overrides.fetch import _ThreadedMapDatasetFetcher
-from torch_overrides.worker import get_worker_info
+from torch_overrides_vanilla.fetch import _MapDatasetFetcher
+from torch_overrides_vanilla.fetch import _IterableDatasetFetcher
+from torch_overrides_vanilla.worker import get_worker_info
 
 T_co = TypeVar("T_co", covariant=True)
 T = TypeVar("T")
@@ -76,18 +66,9 @@ class _DatasetKind(object):
             auto_collation: bool,
             collate_fn: Callable,
             drop_last: bool,
-            fetch_impl: str,
-            num_fetch_workers: int = 1,
     ):
         if kind == _DatasetKind.Map:
-            if fetch_impl == "asyncio":
-                return _AsyncMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
-            elif fetch_impl == "threaded":
-                return _ThreadedMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
-            elif fetch_impl == "vanilla":
-                return _MapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last)
-            else:
-                raise ValueError("Provided fetcher implementation doesn't exist.")
+            return _MapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last)
         else:
             return _IterableDatasetFetcher(dataset, auto_collation, collate_fn, drop_last)
 
@@ -653,8 +634,6 @@ class _SingleProcessDataLoaderIter(_BaseDataLoaderIter):
             self._auto_collation,
             self._collate_fn,
             self._drop_last,
-            loader.fetch_impl,
-            loader.num_fetch_workers,
         )
 
     def _next_data(self):
@@ -987,6 +966,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #     down.
     def __init__(self, loader):
         super(_MultiProcessingDataLoaderIter, self).__init__(loader)
+        print("Vanilla .....................")
 
         assert self._num_workers > 0
         assert self._prefetch_factor > 0
@@ -1015,36 +995,19 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             index_queue.cancel_join_thread()
             w = multiprocessing_context.Process(
                 target=_utils.worker._worker_loop,
-                args=(
-                    self._dataset_kind,
-                    self._dataset,
-                    index_queue,
-                    self._worker_result_queue,
-                    self._workers_done_event,
-                    self._auto_collation,
-                    self._collate_fn,
-                    self._drop_last,
-                    self._base_seed,
-                    self._worker_init_fn,
-                    i,
-                    self._num_workers,
-                    self._persistent_workers,
-                    self.loader.fetch_impl,
-                    self.loader.num_fetch_workers,
-                    self.loader.batch_pool,
-                      # self._dataset_kind,
-                      # self._dataset,
-                      # index_queue,
-                      # self._worker_result_queue,
-                      # self._workers_done_event,
-                      # self._auto_collation,
-                      # self._collate_fn,
-                      # self._drop_last,
-                      # self._base_seed,
-                      # self._worker_init_fn,
-                      # i,
-                      # self._num_workers,
-                      # self._persistent_workers
+                args=(self._dataset_kind,
+                      self._dataset,
+                      index_queue,
+                      self._worker_result_queue,
+                      self._workers_done_event,
+                      self._auto_collation,
+                      self._collate_fn,
+                      self._drop_last,
+                      self._base_seed,
+                      self._worker_init_fn,
+                      i,
+                      self._num_workers,
+                      self._persistent_workers
                       ))
             w.daemon = True
             # NB: Process.start() actually take some time as it needs to
