@@ -664,12 +664,12 @@ class _SingleProcessDataLoaderIter(_BaseDataLoaderIter):
 
     def _next_data(self):
         index = self._next_index()  # may raise StopIteration
-        id = hash(frozenset(index))
-        logging.getLogger("timeline").debug(json.dumps({
-            "item": "batch",
-            "id": id,
-            "start_time": time.time()
-        }))
+        id = hash(frozenset(index)) + time.time()
+        # logging.getLogger("timeline").debug(json.dumps({
+        #     "item": "batch",
+        #     "id": id,
+        #     "start_time": time.time()
+        # }))
         data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
         logging.getLogger("timeline").debug(json.dumps({
             "item": "batch",
@@ -1027,7 +1027,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self.start_data_download()
 
     def start_data_download(self):
-        for _ in self.get_data():
+        for w in self.get_data():
             if self._pin_memory:
                 self._pin_memory_thread_done_event = threading.Event()
                 # Queue is not type-annotated
@@ -1097,8 +1097,10 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             w.start()
             self._index_queues.append(index_queue)
             self._workers.append(w)
+            # for _ in range(self.loader.batch_pool // (self.loader.batch_size // self.loader.num_workers)):
+            # for _ in range(self._prefetch_factor * self._num_workers):
             self._try_prime_index(w, i)
-            yield self._workers
+            yield w
         # this blocks until the processes are complete
         print(f"Done getting data with {i} processes! "
               f"Index queue: {len(self._index_queues)}, workers: {len(self._workers)}")
@@ -1385,9 +1387,8 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._send_idx += 1
 
     def _try_put_index(self):
-        return
+        # return # not necessary?
         assert self._tasks_outstanding < self._prefetch_factor * self._num_workers
-
         try:
             index = self._next_index()
         except StopIteration:

@@ -25,7 +25,7 @@ from misc.logging_configuration import initialize_logging
 
 from torch_overrides.dataloader import DataLoader
 from torch_overrides.worker import _worker_loop
-#
+
 # from torch_overrides_vanilla.dataloader import DataLoader
 # from torch_overrides_vanilla.worker import _worker_loop
 
@@ -91,7 +91,7 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'multi node data parallel training')
 
 parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
-parser.add_argument("--fetch-impl", type=str, default="threaded", help="vanilla | asyncio | threaded")
+parser.add_argument("--fetch-impl", type=str, default="vanilla", help="vanilla | asyncio | threaded")
 parser.add_argument("--dataset-limit", type=int, default=50)
 parser.add_argument("--num-fetch-workers", type=int, default=16)
 parser.add_argument("--prefetch-factor", type=int, default=2)
@@ -326,18 +326,9 @@ def main_worker(gpu, ngpus_per_node, args):
             train_sampler.set_epoch(epoch)
         adjust_learning_rate(optimizer, epoch, args)
 
-        logging.getLogger("timeline").debug(json.dumps({
-            "item": "run_training_batch",
-            "id": hash(epoch),
-            "start_time": time.time()
-        }))
         # train for one epoch
         train(train_loader, model, criterion, optimizer, epoch, args)
-        logging.getLogger("timeline").debug(json.dumps({
-            "item": "run_training_batch",
-            "id": hash(epoch),
-            "end_time": time.time()
-        }))
+
         # # evaluate on validation set
         # acc1 = validate(val_loader, model, criterion, args)
         #
@@ -370,8 +361,8 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
 
     # switch to train mode
     model.train()
-
     end = time.time()
+
     for i, (images, target) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
@@ -381,6 +372,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             "id": hash(hash(frozenset(images)) + 1),
             "start_time": time.time()
         }))
+
         if args.gpu is not None:
             images = images.cuda(args.gpu, non_blocking=True)
         if torch.cuda.is_available():
@@ -392,6 +384,12 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         }))
 
         # compute output
+        s = time.time()
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "run_training_batch",
+            "id": hash(s + epoch),
+            "start_time": time.time()
+        }))
         output = model(images)
         loss = criterion(output, target)
 
@@ -405,6 +403,12 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "run_training_batch",
+            "id": hash(s + epoch),
+            "end_time": time.time()
+        }))
+
 
         # measure elapsed time
         batch_time.update(time.time() - end)

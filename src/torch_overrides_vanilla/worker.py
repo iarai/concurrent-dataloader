@@ -297,7 +297,7 @@ def _worker_loop(dataset_kind, dataset, index_queue, data_queue, done_event,
                 init_exception = None
             else:
                 try:
-                    id = hash(frozenset(index))
+                    id = hash(frozenset(index)) + time.time()
                     logging.getLogger("timeline").debug(json.dumps({
                         "item": "batch",
                         "id": id,

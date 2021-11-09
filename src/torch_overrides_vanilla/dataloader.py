@@ -638,7 +638,7 @@ class _SingleProcessDataLoaderIter(_BaseDataLoaderIter):
 
     def _next_data(self):
         index = self._next_index()  # may raise StopIteration
-        id = hash(frozenset(index))
+        id = hash(frozenset(index)) + time.time()
         logging.getLogger("timeline").debug(json.dumps({
             "item": "batch",
             "id": id,
@@ -1016,7 +1016,10 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             #     it started, so that we do not call .join() if program dies
             #     before it starts, and __del__ tries to join but will get:
             #     AssertionError: can only join a started process.
+            s = time.time()
             w.start()
+            e = time.time()
+            print(f"Start time: {e-s}")
             self._index_queues.append(index_queue)
             self._workers.append(w)
 

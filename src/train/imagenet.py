@@ -35,11 +35,11 @@ from misc.time_helper import stopwatch
 from pytorch_lightning.core import LightningModule
 from pytorch_lightning.profiler import SimpleProfiler
 
-from torch_overrides.dataloader import DataLoader
-from torch_overrides.worker import _worker_loop
-
-# from torch_overrides_vanilla.dataloader import DataLoader
-# from torch_overrides_vanilla.worker import _worker_loop
+# from torch_overrides.dataloader import DataLoader
+# from torch_overrides.worker import _worker_loop
+#
+from torch_overrides_vanilla.dataloader import DataLoader
+from torch_overrides_vanilla.worker import _worker_loop
 
 from pytorch_lightning.callbacks import GPUStatsMonitor
 from pytorch_lightning import loggers as pl_loggers
@@ -62,18 +62,18 @@ class ImageNetLightningModel(LightningModule):
     """
 
     def __init__(
-        self,
-        train_dataloader,
-        val_dataloader,
-        data_path: str,
-        arch: str = "resnet18",
-        pretrained: bool = False,
-        lr: float = 0.1,
-        momentum: float = 0.9,
-        weight_decay: float = 1e-4,
-        batch_size: int = 4,
-        workers: int = 2,
-        **kwargs,
+            self,
+            train_dataloader,
+            val_dataloader,
+            data_path: str,
+            arch: str = "resnet18",
+            pretrained: bool = False,
+            lr: float = 0.1,
+            momentum: float = 0.9,
+            weight_decay: float = 1e-4,
+            batch_size: int = 4,
+            workers: int = 2,
+            **kwargs,
     ):
         super().__init__()
         # self.save_hyperparameters()
@@ -302,13 +302,14 @@ def run_cli():
     parent_parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
     parent_parser.add_argument("--fetch-impl", type=str, default="threaded", help="vanilla | asyncio | threaded")
     parent_parser.add_argument("--dataset-limit", type=int, default=60)
-    parent_parser.add_argument("--batch-pool", type=int, default=16)
-    parent_parser.add_argument("--num-fetch-workers", type=int, default=16)
+    parent_parser.add_argument("--batch-pool", type=int, default=20, help="should be batch size multiplied "
+                                                                          "by a number, e.g. prefetch factor")
+    parent_parser.add_argument("--num-fetch-workers", type=int, default=8)
     parent_parser.add_argument("--num-workers", type=int, default=4)
     parent_parser.add_argument("--prefetch-factor", type=int, default=4)
     parent_parser.add_argument("--dataset", type=str, default="s3", help="s3 | scratch")
     parent_parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
-    parent_parser.add_argument("--batch-size", type=int, default=20)
+    parent_parser.add_argument("--batch-size", type=int, default=4)
     parent_parser.add_argument("--pin-memory", type=int, default=0)
     parent_parser.add_argument("--use-cache", type=int, default=0)
 

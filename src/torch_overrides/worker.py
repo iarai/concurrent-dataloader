@@ -293,12 +293,10 @@ def _worker_loop(
         # `iteration_end` is set, we skip all processing step and just wait for
         # `None`.
         iteration_end = False
-        TIMEOUT = 1
         watchdog = ManagerWatchdog()
         while watchdog.is_alive():
             try:
-                # r = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
-                r = index_queue.get(timeout=TIMEOUT)
+                r = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
                 print(f"Checking out index queue {threading.get_ident()}........................ {r}, {index_queue}")
             except queue.Empty:
                 continue
@@ -334,6 +332,7 @@ def _worker_loop(
                         batch_sizes[idx] = len(index)
                         for i in index:
                             batches[i] = idx
+                        print(f"............... BATCH TO DOWNLOAD: {idx}")
                         logging.getLogger("timeline").debug(json.dumps({
                             "item": "batch",
                             "id": idx,
@@ -342,8 +341,8 @@ def _worker_loop(
                         # take remaining ones
                         for _ in range(batch_pool):
                             if not index_queue.empty():
-                                # current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
-                                current_batch = index_queue.get(timeout=TIMEOUT)
+                                print("Taking more .....................")
+                                current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
                                 batch_id, batch_indices = current_batch
                                 batch_sizes[batch_id] = len(batch_indices)
                                 logging.getLogger("timeline").debug(json.dumps({
@@ -364,9 +363,11 @@ def _worker_loop(
                                 "id": batch_id,
                                 "end_time": time.time()
                             }))
+                            print(f"............... BATCH HERE: {batch_id}")
+
                             data_queue.put((batch_id, b))
                     else:
-                        id = hash(frozenset(index))
+                        id = hash(frozenset(index)) + time.time()
                         logging.getLogger("timeline").debug(json.dumps({
                             "item": "batch",
                             "id": id,
