@@ -155,7 +155,6 @@ class TrainingEpochLoop(loops.Loop):
 
         self.batch_progress.increment_ready()
 
-        print("Training starts.......................")
         logging.getLogger("timeline").debug(json.dumps({
             "item": "run_training_batch",
             "id": hash(frozenset(batch)),
@@ -169,7 +168,6 @@ class TrainingEpochLoop(loops.Loop):
             "id": hash(frozenset(batch)),
             "end_time": time.time()
         }))
-        print("Loop done...")
         self.batch_progress.increment_processed()
 
         # when returning -1 from train_step, we end epoch early

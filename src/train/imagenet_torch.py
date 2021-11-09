@@ -23,12 +23,12 @@ from functools import partial
 import logging
 from misc.logging_configuration import initialize_logging
 
-from torch_overrides.dataloader import DataLoader
-from torch_overrides.worker import _worker_loop
+from torch_overrides.dataloader import DataLoader as DataLoaderParallel
+from torch_overrides.worker import _worker_loop as _worker_loop_parallel
 
-# from torch_overrides_vanilla.dataloader import DataLoader
-# from torch_overrides_vanilla.worker import _worker_loop
-
+from torch_overrides_vanilla.dataloader import DataLoader as DataLoaderVanilla
+from torch_overrides_vanilla.worker import _worker_loop as _worker_loop_vanilla
+#
 from main import get_dataset
 from main import init_benchmarking
 from pathlib import Path
@@ -91,16 +91,16 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'multi node data parallel training')
 
 parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
-parser.add_argument("--fetch-impl", type=str, default="vanilla", help="vanilla | asyncio | threaded")
-parser.add_argument("--dataset-limit", type=int, default=50)
-parser.add_argument("--num-fetch-workers", type=int, default=16)
-parser.add_argument("--prefetch-factor", type=int, default=2)
+parser.add_argument("--fetch-impl", type=str, default="asyncio", help="vanilla | threaded | asyncio")
+parser.add_argument("--dataset-limit", type=int, default=60)
+parser.add_argument("--num-fetch-workers", type=int, default=8)
+parser.add_argument("--prefetch-factor", type=int, default=4)
 parser.add_argument("--dataset", type=str, default="s3", help="s3 | scratch")
 parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
-parser.add_argument("--batch-size", type=int, default=10)
+parser.add_argument("--batch-size", type=int, default=4)
 parser.add_argument("--pin-memory", type=int, default=0)
 parser.add_argument("--use-cache", type=int, default=0)
-parser.add_argument("--batch-pool", type=int, default=16)
+parser.add_argument("--batch-pool", type=int, default=20)
 
 best_acc1 = 0
 
@@ -257,34 +257,44 @@ def main_worker(gpu, ngpus_per_node, args):
 
     val_dataset.set_transform(transform)
     train_dataset.set_transform(transform)
-    train_loader = DataLoader(
-        dataset=train_dataset,
-        batch_size=args.batch_size,
-        num_workers=args.workers,
-        shuffle=(train_sampler is None),
-        prefetch_factor=args.prefetch_factor,
-        num_fetch_workers=args.num_fetch_workers,
-        fetch_impl=args.fetch_impl,
-        batch_pool=args.batch_pool,
-        pin_memory=True,
-    )
-    val_loader = DataLoader(
-        dataset=val_dataset,
-        batch_size=args.batch_size,
-        num_workers=args.workers,
-        shuffle=False,
-        prefetch_factor=args.prefetch_factor,
-        num_fetch_workers=args.num_fetch_workers,
-        fetch_impl=args.fetch_impl,
-        batch_pool=args.batch_pool,
-        pin_memory=args.pin_memory,
-    )
+    if args.fetch_impl == "vanilla":
+        train_loader = DataLoaderVanilla(
+            dataset=train_dataset,
+            batch_size=args.batch_size,
+            num_workers=args.workers,
+            shuffle=(train_sampler is None),
+            prefetch_factor=args.prefetch_factor,
+            pin_memory=True,
+        )
+    else:
+        train_loader = DataLoaderParallel(
+            dataset=train_dataset,
+            batch_size=args.batch_size,
+            num_workers=args.workers,
+            shuffle=(train_sampler is None),
+            prefetch_factor=args.prefetch_factor,
+            num_fetch_workers=args.num_fetch_workers,
+            fetch_impl=args.fetch_impl,
+            batch_pool=args.batch_pool,
+            pin_memory=True,
+        )
+    # val_loader = DataLoader(
+    #     dataset=val_dataset,
+    #     batch_size=args.batch_size,
+    #     num_workers=args.workers,
+    #     shuffle=False,
+    #     prefetch_factor=args.prefetch_factor,
+    #     num_fetch_workers=args.num_fetch_workers,
+    #     fetch_impl=args.fetch_impl,
+    #     batch_pool=args.batch_pool,
+    #     pin_memory=args.pin_memory,
+    # )
 
     output_base_folder = init_benchmarking(
         args=args,
         action="_".join(
             [
-                "benchmark_e2e",
+                "benchmark_e2e_torch",
                 str(args.dataset),
                 str(args.batch_size),
                 str(args.workers),
@@ -297,7 +307,7 @@ def main_worker(gpu, ngpus_per_node, args):
     )
     
     torch.utils.data._utils.worker._worker_loop = partial(
-        _worker_loop,
+        _worker_loop_vanilla if args.fetch_impl == "vanilla" else _worker_loop_parallel,
         initializer=partial(
             initialize_logging, loglevel=logging.getLogger().getEffectiveLevel(), output_base_folder=output_base_folder,
         ),

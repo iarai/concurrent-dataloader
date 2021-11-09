@@ -35,11 +35,11 @@ from misc.time_helper import stopwatch
 from pytorch_lightning.core import LightningModule
 from pytorch_lightning.profiler import SimpleProfiler
 
-# from torch_overrides.dataloader import DataLoader
-# from torch_overrides.worker import _worker_loop
-#
-from torch_overrides_vanilla.dataloader import DataLoader
-from torch_overrides_vanilla.worker import _worker_loop
+from torch_overrides.dataloader import DataLoader as DataLoaderParallel
+from torch_overrides.worker import _worker_loop as _worker_loop_parallel
+
+from torch_overrides_vanilla.dataloader import DataLoader as DataLoaderVanilla
+from torch_overrides_vanilla.worker import _worker_loop as _worker_loop_vanilla
 
 from pytorch_lightning.callbacks import GPUStatsMonitor
 from pytorch_lightning import loggers as pl_loggers
@@ -95,14 +95,12 @@ class ImageNetLightningModel(LightningModule):
     # @stopwatch(trace_name="(6)-training_step", trace_level=6)
     def training_step(self, batch, batch_idx):
         images, target = batch
-        print("In trainer step...")
         output = self(images)
         loss_train = F.cross_entropy(output, target)
         acc1, acc5 = self.__accuracy(output, target, topk=(1, 5))
         self.log("train_loss", loss_train, on_step=True, on_epoch=True, logger=True)
         self.log("train_acc1", acc1, on_step=True, prog_bar=True, on_epoch=True, logger=True)
         self.log("train_acc5", acc5, on_step=True, on_epoch=True, logger=True)
-        print("Step done")
         return loss_train
 
     # @stopwatch(trace_name="(7)-validation_step", trace_level=7)
@@ -210,17 +208,27 @@ def main(args: Namespace) -> None:
 
     val_dataset.set_transform(transform)
     train_dataset.set_transform(transform)
-    train_data_loader = DataLoader(
-        dataset=train_dataset,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        shuffle=False,
-        prefetch_factor=args.prefetch_factor,
-        num_fetch_workers=args.num_fetch_workers,
-        fetch_impl=args.fetch_impl,
-        batch_pool=args.batch_pool,
-        pin_memory=args.pin_memory,
-    )
+    if args.fetch_impl == "vanilla":
+        train_data_loader = DataLoaderVanilla(
+            dataset=train_dataset,
+            batch_size=args.batch_size,
+            num_workers=args.workers,
+            shuffle=False,
+            prefetch_factor=args.prefetch_factor,
+            pin_memory=True,
+        )
+    else:
+        train_data_loader = DataLoaderParallel(
+            dataset=train_dataset,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            shuffle=False,
+            prefetch_factor=args.prefetch_factor,
+            num_fetch_workers=args.num_fetch_workers,
+            fetch_impl=args.fetch_impl,
+            batch_pool=args.batch_pool,
+            pin_memory=args.pin_memory,
+        )
     # val_data_loader = DataLoader(
     #     dataset=val_dataset,
     #     batch_size=args.batch_size,
@@ -237,7 +245,7 @@ def main(args: Namespace) -> None:
         args=args,
         action="_".join(
             [
-                "benchmark_e2e",
+                "benchmark_e2e_lightning",
                 str(args.dataset),
                 str(args.batch_size),
                 str(args.num_workers),
@@ -250,7 +258,7 @@ def main(args: Namespace) -> None:
     )
 
     torch.utils.data._utils.worker._worker_loop = partial(
-        _worker_loop,
+        _worker_loop_vanilla if args.fetch_impl == "vanilla" else _worker_loop_parallel,
         initializer=partial(
             initialize_logging, loglevel=logging.getLogger().getEffectiveLevel(), output_base_folder=output_base_folder,
         ),
@@ -300,7 +308,7 @@ def run_cli():
         "-e", "--evaluate", dest="evaluate", action="store_true", help="evaluate model on validation set"
     )
     parent_parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
-    parent_parser.add_argument("--fetch-impl", type=str, default="threaded", help="vanilla | asyncio | threaded")
+    parent_parser.add_argument("--fetch-impl", type=str, default="asyncio", help="vanilla | threaded | asyncio")
     parent_parser.add_argument("--dataset-limit", type=int, default=60)
     parent_parser.add_argument("--batch-pool", type=int, default=20, help="should be batch size multiplied "
                                                                           "by a number, e.g. prefetch factor")

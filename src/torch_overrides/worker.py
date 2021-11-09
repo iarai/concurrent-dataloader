@@ -237,11 +237,11 @@ def _worker_loop(
     fetch_impl,
     num_fetch_workers,
     batch_pool=10,  # number of batches to fetch simultaneously
+    start_time=None,
     initializer=None,
 ):
     if initializer is not None:
         initializer()
-
 
     # See NOTE [ Data Loader Multiprocessing Shutdown Logic ] for details on the
     # logic of this function.
@@ -297,7 +297,6 @@ def _worker_loop(
         while watchdog.is_alive():
             try:
                 r = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
-                print(f"Checking out index queue {threading.get_ident()}........................ {r}, {index_queue}")
             except queue.Empty:
                 continue
             if isinstance(r, _ResumeIteration):
@@ -332,22 +331,20 @@ def _worker_loop(
                         batch_sizes[idx] = len(index)
                         for i in index:
                             batches[i] = idx
-                        print(f"............... BATCH TO DOWNLOAD: {idx}")
                         logging.getLogger("timeline").debug(json.dumps({
                             "item": "batch",
-                            "id": idx,
+                            "id": idx + start_time,
                             "start_time": time.time()
                         }))
                         # take remaining ones
                         for _ in range(batch_pool):
                             if not index_queue.empty():
-                                print("Taking more .....................")
                                 current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
                                 batch_id, batch_indices = current_batch
                                 batch_sizes[batch_id] = len(batch_indices)
                                 logging.getLogger("timeline").debug(json.dumps({
                                     "item": "batch",
-                                    "id": batch_id,
+                                    "id": batch_id + start_time,
                                     "start_time": time.time()
                                 }))
                                 for index in batch_indices:
@@ -360,11 +357,9 @@ def _worker_loop(
                             b = collate_fn([b["tensor"] for b in batch])
                             logging.getLogger("timeline").debug(json.dumps({
                                 "item": "batch",
-                                "id": batch_id,
+                                "id": batch_id + start_time,
                                 "end_time": time.time()
                             }))
-                            print(f"............... BATCH HERE: {batch_id}")
-
                             data_queue.put((batch_id, b))
                     else:
                         id = hash(frozenset(index)) + time.time()
@@ -392,7 +387,6 @@ def _worker_loop(
                         # See NOTE [ Python Traceback Reference Cycle Problem ]
                         data = ExceptionWrapper(where="in DataLoader worker process {}".format(worker_id))
             if fetch_impl != "threaded":
-                print(f"Putting (done?): {idx}")
                 data_queue.put((idx, data))
                 del data
             del idx, index, r  # save memory
@@ -402,4 +396,3 @@ def _worker_loop(
     if done_event.is_set():
         data_queue.cancel_join_thread()
         data_queue.close()
-    print(f"Worker {worker_id} done!")

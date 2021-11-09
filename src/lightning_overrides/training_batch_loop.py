@@ -309,7 +309,6 @@ class TrainingBatchLoop(Loop):
             training_step_output = self.trainer.call_hook("training_step_end", training_step_output)
 
             self._check_training_step_output(training_step_output)
-            print("Training step 8")
 
             training_step_output = self._process_training_step_output(training_step_output)
 
@@ -588,18 +587,10 @@ class TrainingBatchLoop(Loop):
             opt_idx: Index of the current optimizer being used. ``None`` if using manual optimization.
         """
         # backward can be called manually in the training loop
-        print("Backward started...")
         if isinstance(result, Tensor):
-            print("Backward started...2")
             self.trainer.accelerator.backward(result, optimizer, *args, **kwargs)
-            print("Backward started...2 - done")
-
         else:
-            print("Backward started...3")
             result.closure_loss = self.trainer.accelerator.backward(result.closure_loss, optimizer, *args, **kwargs)
-            print("Backward started...3 - done")
-
-        print("Backward started... 5")
 
         if not self.should_accumulate():
             # track gradients

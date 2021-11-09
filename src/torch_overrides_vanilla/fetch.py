@@ -21,7 +21,6 @@ class _IterableDatasetFetcher(_BaseDatasetFetcher):
         super(_IterableDatasetFetcher, self).__init__(dataset, auto_collation, collate_fn, drop_last)
         self.dataset_iter = iter(dataset)
         self.ended = False
-        print("Vanilla fetcher............")
 
     @stopwatch(trace_name="(4)-fetcher", trace_level=4)
     def fetch(self, possibly_batched_index):

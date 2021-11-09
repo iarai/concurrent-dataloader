@@ -74,12 +74,9 @@ class PrecisionPlugin(Plugin, CheckpointHooks):
             optimizer: current optimizer being used. ``None`` if using manual optimization
         """
         # do backward pass
-        print("Do backward pass?")
         if model is not None and isinstance(model, pl.LightningModule):
-            print("Do backward pass 1")
             model.backward(closure_loss, optimizer, *args, **kwargs)
         else:
-            print("Do backward pass 2")
             closure_loss.backward(*args, **kwargs)
 
     def post_backward(self, model: "pl.LightningModule", closure_loss: Tensor) -> Tensor:

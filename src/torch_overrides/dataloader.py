@@ -45,6 +45,7 @@ from torch_overrides.fetch import _IterableDatasetFetcher
 from torch_overrides.fetch import _MapDatasetFetcher
 from torch_overrides.fetch import _ThreadedMapDatasetFetcher
 from torch_overrides.worker import get_worker_info
+from torch_overrides.worker import _worker_loop
 
 T_co = TypeVar("T_co", covariant=True)
 T = TypeVar("T")
@@ -1053,7 +1054,6 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             # yield
 
     def get_data(self):
-        print(f"Get data starts for... {self._num_workers} workers")
         if self.download_in_progress:
             return
         self.download_in_progress = True
@@ -1063,10 +1063,10 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             # Need to `cancel_join_thread` here!
             # See sections (2) and (3b) above.
             index_queue.cancel_join_thread()
-            print(f"Creating process {i}")
             # this is slow!
+            t = time.time()
             w = self.multiprocessing_context.Process(
-                target=_utils.worker._worker_loop,
+                target=_worker_loop,
                 args=(
                     self._dataset_kind,
                     self._dataset,
@@ -1084,9 +1084,9 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                     self.loader.fetch_impl,
                     self.loader.num_fetch_workers,
                     self.loader.batch_pool,
+                    t,
                 ),
             )
-            print(f"Creating process done {i}")
             w.daemon = True
             # NB: Process.start() actually take some time as it needs to
             #     start a process and pass the arguments over via a pipe.
@@ -1101,9 +1101,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             # for _ in range(self._prefetch_factor * self._num_workers):
             self._try_prime_index(w, i)
             yield w
-        # this blocks until the processes are complete
-        print(f"Done getting data with {i} processes! "
-              f"Index queue: {len(self._index_queues)}, workers: {len(self._workers)}")
+
 
     def _reset(self, loader, first_iter=False):
         super()._reset(loader, first_iter)
@@ -1149,9 +1147,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         # Returns a 2-tuple:
         #   (bool: whether successfully get data, any: data if successful else None)
         try:
-            print("\nGetting data")
             data = self._data_queue.get(timeout=timeout)
-            print("Getting here...")
             # data = self._data_queue.get_nowait()
             return (True, data)
         except Exception as e:
@@ -1374,12 +1370,9 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         # assert self._tasks_outstanding < self._prefetch_factor * self._num_workers
         try:
             index = self._next_index()
-            print(f"Index: {index}")
         except StopIteration:
             return
-        print(f"Workers: {self._num_workers}")
         worker_queue_idx = id
-        print(f"Putting index: {index} -> worker: {worker_queue_idx}")
         self._workers_status[id] = True
         self._index_queues[worker_queue_idx].put((self._send_idx, index))
         self._task_info[self._send_idx] = (worker_queue_idx,)
@@ -1401,7 +1394,6 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             # not found (i.e., didn't break)
             return
         self._index_queues[worker_queue_idx].put((self._send_idx, index))
-        # print(f"Putting index: {index} -> worker: {worker_queue_idx}")
         self._task_info[self._send_idx] = (worker_queue_idx,)
         self._tasks_outstanding += 1
         self._send_idx += 1

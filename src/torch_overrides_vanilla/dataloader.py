@@ -35,6 +35,7 @@ from torch.utils.data import SequentialSampler
 from torch_overrides_vanilla.fetch import _MapDatasetFetcher
 from torch_overrides_vanilla.fetch import _IterableDatasetFetcher
 from torch_overrides_vanilla.worker import get_worker_info
+from torch_overrides_vanilla.worker import _worker_loop
 
 T_co = TypeVar("T_co", covariant=True)
 T = TypeVar("T")
@@ -198,13 +199,8 @@ class DataLoader(Generic[T_co]):
             *,
             prefetch_factor: int = 2,
             persistent_workers: bool = False,
-            num_fetch_workers: int = 1,
-            batch_pool: int = 10,
-            fetch_impl: str = "threaded"
+            # fetch_impl: str = "threaded"
     ):
-        self.num_fetch_workers = num_fetch_workers
-        self.batch_pool = batch_pool
-        self.fetch_impl = fetch_impl
         torch._C._log_api_usage_once("python.data_loader")
 
         if num_workers < 0:
@@ -229,8 +225,6 @@ class DataLoader(Generic[T_co]):
 
         # cannot have _SingleProcessDataLoaderIter for threaded implementation
         self.num_workers = num_workers
-        if self.num_workers == 0 and fetch_impl == "threaded":
-            self.num_workers = 1
         self.prefetch_factor = prefetch_factor
         if pin_memory == 0:
             self.pin_memory = False
@@ -966,7 +960,6 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #     down.
     def __init__(self, loader):
         super(_MultiProcessingDataLoaderIter, self).__init__(loader)
-        print("Vanilla .....................")
 
         assert self._num_workers > 0
         assert self._prefetch_factor > 0
@@ -994,7 +987,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             # See sections (2) and (3b) above.
             index_queue.cancel_join_thread()
             w = multiprocessing_context.Process(
-                target=_utils.worker._worker_loop,
+                target=_worker_loop,
                 args=(self._dataset_kind,
                       self._dataset,
                       index_queue,
@@ -1016,10 +1009,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             #     it started, so that we do not call .join() if program dies
             #     before it starts, and __del__ tries to join but will get:
             #     AssertionError: can only join a started process.
-            s = time.time()
             w.start()
-            e = time.time()
-            print(f"Start time: {e-s}")
             self._index_queues.append(index_queue)
             self._workers.append(w)
 
