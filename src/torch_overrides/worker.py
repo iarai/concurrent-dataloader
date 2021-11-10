@@ -338,6 +338,7 @@ def _worker_loop(
                         }))
                         # take remaining ones
                         for _ in range(batch_pool):
+                            # time.sleep(0.00001)
                             if not index_queue.empty():
                                 current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
                                 batch_id, batch_indices = current_batch
