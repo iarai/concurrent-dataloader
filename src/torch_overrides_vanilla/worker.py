@@ -297,16 +297,16 @@ def _worker_loop(dataset_kind, dataset, index_queue, data_queue, done_event,
                 init_exception = None
             else:
                 try:
-                    id = hash(frozenset(index)) + time.time()
+                    batch_timeline_id = abs(hash(frozenset(index)) + time.time())
                     logging.getLogger("timeline").debug(json.dumps({
                         "item": "batch",
-                        "id": id,
+                        "id": batch_timeline_id,
                         "start_time": time.time()
                     }))
                     data = fetcher.fetch(index)
                     logging.getLogger("timeline").debug(json.dumps({
                         "item": "batch",
-                        "id": id,
+                        "id": batch_timeline_id,
                         "end_time": time.time()
                     }))
                 except Exception as e:

@@ -632,16 +632,16 @@ class _SingleProcessDataLoaderIter(_BaseDataLoaderIter):
 
     def _next_data(self):
         index = self._next_index()  # may raise StopIteration
-        id = hash(frozenset(index)) + time.time()
+        batch_timeline_id = abs(hash(frozenset(index)) + time.time())
         logging.getLogger("timeline").debug(json.dumps({
             "item": "batch",
-            "id": id,
+            "id": batch_timeline_id,
             "start_time": time.time()
         }))
         data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
         logging.getLogger("timeline").debug(json.dumps({
             "item": "batch",
-            "id": id,
+            "id": batch_timeline_id,
             "end_time": time.time()
         }))
         if self._pin_memory:

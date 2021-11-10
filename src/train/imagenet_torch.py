@@ -83,8 +83,7 @@ parser.add_argument('--dist-backend', default='nccl', type=str,
                     help='distributed backend')
 # parser.add_argument('--seed', default=None, type=int,
 #                     help='seed for initializing training. ')
-parser.add_argument('--gpu', default=2, type=int,
-                    help='GPU id to use.')
+parser.add_argument('--gpu', default=2, type=int, help='GPU id to use.')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
                          'N processes per node, which has N GPUs. This is the '
@@ -146,8 +145,11 @@ def main_worker(gpu, ngpus_per_node, args):
     global best_acc1
     args.gpu = gpu
 
-    if args.gpu is not None:
-        print("Use GPU: {} for training".format(args.gpu))
+    if torch.cuda.device_count() > 0:
+        if args.gpu is not None:
+            print("Use GPU: {} for training".format(args.gpu))
+    else:
+        args.gpu = None
 
     if args.distributed:
         if args.dist_url == "env://" and args.rank == -1:
@@ -333,8 +335,9 @@ def main_worker(gpu, ngpus_per_node, args):
     #     validate(val_loader, model, criterion, args)
     #     return
 
-    gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
-    gpu_logger.start()
+    if torch.cuda.device_count() > 0:
+        gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
+        gpu_logger.start()
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
@@ -361,7 +364,9 @@ def main_worker(gpu, ngpus_per_node, args):
                 'best_acc1': best_acc1,
                 'optimizer': optimizer.state_dict(),
             }, is_best)
-    gpu_logger.stop()
+
+    if torch.cuda.device_count() > 0 and gpu_logger is not None:
+        gpu_logger.stop()
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
@@ -402,10 +407,10 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         }))
 
         # compute output
-        s = time.time()
+        training_batch_timeline_id = abs(hash(time.time() + epoch))
         logging.getLogger("timeline").debug(json.dumps({
             "item": "run_training_batch",
-            "id": hash(s + epoch),
+            "id": training_batch_timeline_id,
             "start_time": time.time()
         }))
         output = model(images)
@@ -423,7 +428,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         optimizer.step()
         logging.getLogger("timeline").debug(json.dumps({
             "item": "run_training_batch",
-            "id": hash(s + epoch),
+            "id": training_batch_timeline_id,
             "end_time": time.time()
         }))
 
