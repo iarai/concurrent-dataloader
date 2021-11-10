@@ -140,24 +140,26 @@ class TrainingEpochLoop(loops.Loop):
         # ------------------------------------
         # TRAINING_STEP + TRAINING_STEP_END
         # ------------------------------------
+        to_device_timeline_id = abs(hash(frozenset(batch)))
         logging.getLogger("timeline").debug(json.dumps({
             "item": "training_batch_to_device",
-            "id": hash(hash(frozenset(batch)) + 1),
+            "id": to_device_timeline_id,
             "start_time": time.time()
         }))
         with self.trainer.profiler.profile("training_batch_to_device"):
             batch = self.trainer.accelerator.batch_to_device(batch, dataloader_idx=self._dataloader_idx)
         logging.getLogger("timeline").debug(json.dumps({
             "item": "training_batch_to_device",
-            "id": hash(hash(frozenset(batch)) + 1),
+            "id": to_device_timeline_id,
             "end_time": time.time()
         }))
 
         self.batch_progress.increment_ready()
 
+        run_training_timeline_id = abs(hash(frozenset(batch))) + time.time()
         logging.getLogger("timeline").debug(json.dumps({
             "item": "run_training_batch",
-            "id": hash(frozenset(batch)),
+            "id": run_training_timeline_id,
             "start_time": time.time()
         }))
         with self.trainer.profiler.profile("run_training_batch"):
@@ -165,7 +167,7 @@ class TrainingEpochLoop(loops.Loop):
             self.batches_seen += 1
         logging.getLogger("timeline").debug(json.dumps({
             "item": "run_training_batch",
-            "id": hash(frozenset(batch)),
+            "id": run_training_timeline_id,
             "end_time": time.time()
         }))
         self.batch_progress.increment_processed()

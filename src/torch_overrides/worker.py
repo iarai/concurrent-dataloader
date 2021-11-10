@@ -352,6 +352,7 @@ def _worker_loop(
 
                         # logging.getLogger("stopwatch").debug(json.dumps(data))
                         for batch, batch_id in fetcher.yield_batch(items=batches, batch_sizes=batch_sizes):
+                            time.sleep(0.0001)
                             batch.sort(key=lambda index: index["item_id"])
                             # print(f"Got batch {batch_id} ({len(batch)})")
                             b = collate_fn([b["tensor"] for b in batch])
@@ -362,16 +363,16 @@ def _worker_loop(
                             }))
                             data_queue.put((batch_id, b))
                     else:
-                        id = hash(frozenset(index)) + time.time()
+                        timeline_batch_id = abs(hash(frozenset(index)) + time.time())
                         logging.getLogger("timeline").debug(json.dumps({
                             "item": "batch",
-                            "id": id,
+                            "id": timeline_batch_id,
                             "start_time": time.time()
                         }))
                         data = fetcher.fetch(index)
                         logging.getLogger("timeline").debug(json.dumps({
                             "item": "batch",
-                            "id": id,
+                            "id": timeline_batch_id,
                             "end_time": time.time()
                         }))
                 except Exception as e:
