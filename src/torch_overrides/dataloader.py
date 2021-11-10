@@ -1022,7 +1022,6 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._workers_status = [False for i in range(self._num_workers)]
         self._tasks_outstanding = 0
 
-        self.start_data_download()
 
     def start_download(self):
         self.start_data_download()
@@ -1033,6 +1032,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                 self._pin_memory_thread_done_event = threading.Event()
                 # Queue is not type-annotated
                 self._data_queue = queue.Queue()  # type: ignore[var-annotated]
+                # self._data_queue = self.multiprocessing_context.Queue()  # type: ignore[var-annotated]
                 pin_memory_thread = threading.Thread(
                     target=_utils.pin_memory._pin_memory_loop,
                     args=(

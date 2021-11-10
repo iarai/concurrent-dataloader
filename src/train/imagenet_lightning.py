@@ -32,6 +32,7 @@ from main import get_dataset
 from main import init_benchmarking
 from misc.logging_configuration import initialize_logging
 from misc.time_helper import stopwatch
+from misc.gpulogger import GPUSidecarLogger
 from pytorch_lightning.core import LightningModule
 from pytorch_lightning.profiler import SimpleProfiler
 
@@ -278,6 +279,10 @@ def main(args: Namespace) -> None:
     # model = ImageNetLightningModel(train_dataloader=train_data_loader, **vars(args))
     # val_dataset.set_device(model.device)
     # train_dataset.set_device(model.device)
+    
+    gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
+    gpu_logger.start()
+
 
     tb_logger = pl_loggers.TensorBoardLogger(f"{output_base_folder}/lightning/")
     profiler = SimpleProfiler(output_filename=f"{output_base_folder}/lightning/{time.time()}.txt")
@@ -285,10 +290,11 @@ def main(args: Namespace) -> None:
                                             profiler=profiler,
                                             logger=tb_logger,
                                             log_every_n_steps=5,
-                                            # callbacks=[GPUStatsMonitor()]
+                                            callbacks=[GPUStatsMonitor()]
                                             )
 
     start_train(args, model, trainer)
+    gpu_logger.stop()
 
 
 @stopwatch(trace_name="(8)-start_train", trace_level=8)
@@ -332,8 +338,8 @@ def run_cli():
     pytorch_lightning.plugins.precision.precision_plugin.PrecisionPlugin.backward = precision_plugin.PrecisionPlugin.backward
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
-    parser.set_defaults(deterministic=True, max_epochs=3)
-    # parser.set_defaults(deterministic=True, max_epochs=5, gpus=[2])
+    # parser.set_defaults(deterministic=True, max_epochs=3)
+    parser.set_defaults(deterministic=True, max_epochs=10, gpus=[2])
     args = parser.parse_args()
     main(args)
 

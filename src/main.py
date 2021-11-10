@@ -55,7 +55,7 @@ def get_dataset(
     elif dataset == "s3":
         if use_cache == 1:
             use_cache = True
-            endpoint = "http://localhost:8080"
+            endpoint = "http://localhost:6081"
         else:
             use_cache = False
             endpoint = "http://s3.amazonaws.com"

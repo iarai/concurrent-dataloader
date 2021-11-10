@@ -30,3 +30,10 @@ def initialize_logging(output_base_folder: str, loglevel=INFO):
     logging.getLogger("timeline").addHandler(timeline_log)
     logging.getLogger("timeline").setLevel(logging.DEBUG)
     logging.getLogger("timeline").propagate = False
+
+    # gpu_util logger
+    gpu_util_log = logging.FileHandler(os.path.join(output_base_folder, f"gpuutil-{os.getpid()}.log"))
+    gpu_util_log.setFormatter(logging.Formatter(""))
+    logging.getLogger("gpuutil").addHandler(gpu_util_log)
+    logging.getLogger("gpuutil").setLevel(logging.DEBUG)
+    logging.getLogger("gpuutil").propagate = False

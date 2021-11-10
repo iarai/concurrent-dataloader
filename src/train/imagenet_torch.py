@@ -22,6 +22,7 @@ import torchvision.models as models
 from functools import partial
 import logging
 from misc.logging_configuration import initialize_logging
+from misc.gpulogger import GPUSidecarLogger
 
 from torch_overrides.dataloader import DataLoader as DataLoaderParallel
 from torch_overrides.worker import _worker_loop as _worker_loop_parallel
@@ -46,9 +47,9 @@ parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     help='model architecture: ' +
                          ' | '.join(model_names) +
                          ' (default: resnet18)')
-parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
+parser.add_argument('-j', '--num-workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=3, type=int, metavar='N', # default 90
+parser.add_argument('--epochs', default=10, type=int, metavar='N', # default 90
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
@@ -82,7 +83,7 @@ parser.add_argument('--dist-backend', default='nccl', type=str,
                     help='distributed backend')
 # parser.add_argument('--seed', default=None, type=int,
 #                     help='seed for initializing training. ')
-parser.add_argument('--gpu', default=None, type=int,
+parser.add_argument('--gpu', default=2, type=int,
                     help='GPU id to use.')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
@@ -101,6 +102,7 @@ parser.add_argument("--batch-size", type=int, default=4)
 parser.add_argument("--pin-memory", type=int, default=0)
 parser.add_argument("--use-cache", type=int, default=0)
 parser.add_argument("--batch-pool", type=int, default=20)
+parser.add_argument("--num_sanity_val_steps", type=int, default=0)
 
 best_acc1 = 0
 
@@ -177,7 +179,7 @@ def main_worker(gpu, ngpus_per_node, args):
             # DistributedDataParallel, we need to divide the batch size
             # ourselves based on the total number of GPUs we have
             args.batch_size = int(args.batch_size / ngpus_per_node)
-            args.workers = int((args.workers + ngpus_per_node - 1) / ngpus_per_node)
+            args.num_workers = int((args.num_workers + ngpus_per_node - 1) / ngpus_per_node)
             model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         else:
             model.cuda()
@@ -261,27 +263,27 @@ def main_worker(gpu, ngpus_per_node, args):
         train_loader = DataLoaderVanilla(
             dataset=train_dataset,
             batch_size=args.batch_size,
-            num_workers=args.workers,
+            num_workers=args.num_workers,
             shuffle=(train_sampler is None),
             prefetch_factor=args.prefetch_factor,
-            pin_memory=True,
+            pin_memory=True if args.pin_memory == 1 else False,
         )
     else:
         train_loader = DataLoaderParallel(
             dataset=train_dataset,
             batch_size=args.batch_size,
-            num_workers=args.workers,
+            num_workers=args.num_workers,
             shuffle=(train_sampler is None),
             prefetch_factor=args.prefetch_factor,
             num_fetch_workers=args.num_fetch_workers,
             fetch_impl=args.fetch_impl,
             batch_pool=args.batch_pool,
-            pin_memory=True,
+            pin_memory=True if args.pin_memory == 1 else False,
         )
     # val_loader = DataLoader(
     #     dataset=val_dataset,
     #     batch_size=args.batch_size,
-    #     num_workers=args.workers,
+    #     num_workers=args.num_workers,
     #     shuffle=False,
     #     prefetch_factor=args.prefetch_factor,
     #     num_fetch_workers=args.num_fetch_workers,
@@ -297,7 +299,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 "benchmark_e2e_torch",
                 str(args.dataset),
                 str(args.batch_size),
-                str(args.workers),
+                str(args.num_workers),
                 str(args.num_fetch_workers),
                 str(args.use_cache),
                 str(args.fetch_impl),
@@ -330,6 +332,9 @@ def main_worker(gpu, ngpus_per_node, args):
     # if args.evaluate:
     #     validate(val_loader, model, criterion, args)
     #     return
+    
+    gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
+    gpu_logger.start()
 
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed:
@@ -356,6 +361,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'best_acc1': best_acc1,
                 'optimizer': optimizer.state_dict(),
             }, is_best)
+    gpu_logger.stop()
 
 
 def train(train_loader, model, criterion, optimizer, epoch, args):
@@ -368,6 +374,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         len(train_loader),
         [batch_time, data_time, losses, top1, top5],
         prefix="Epoch: [{}]".format(epoch))
+
 
     # switch to train mode
     model.train()

@@ -96,19 +96,18 @@
 
 for fetch_impl in "vanilla" "threaded" "asyncio" ; do
   for storage in "s3"; do
-    # for batch_size in 100 200 400 600 800 1000 1100; do
-    for batch_size in 200 400 800; do
-        python3 train/imagenet.py --output_base_folder /iarai/home/ivan.svogor/git/storage-benchmarking/src/benchmark_output/e2e2710 \
+    # for implementation in "train/imagenet_torch.py"; do
+    for implementation in "train/imagenet_torch.py" "train/imagenet_lightning.py" ; do
+        python3 "${implementation}" --output_base_folder /iarai/home/ivan.svogor/git/storage-benchmarking/src/benchmark_output/1011_2 \
         --dataset "${storage}" \
         --num-fetch-workers 16 \
-        --num-workers 8 \
-        --dataset-limit 5000 \
-        --batch-size "${batch_size}" \
-        --prefetch-factor 16 \
+        --num-workers 4 \
+        --batch-pool 512 \
+        --dataset-limit 15000 \
+        --batch-size 256 \
+        --prefetch-factor 2 \
         --fetch-impl "${fetch_impl}" \
-        # --accelerator ddp \
-        # --gpus 1 \
-        -- use-cache 1 \
+        --use-cache 1 \
         --num_sanity_val_steps 0
     done
   done
