@@ -233,13 +233,17 @@ def _worker_loop(
     worker_id,
     num_workers,
     persistent_workers,
+    # // Modified: added parameter for initializing the log
     initializer=None,
+    # \\
 ):
     # See NOTE [ Data Loader Multiprocessing Shutdown Logic ] for details on the
     # logic of this function.
 
+    # // Modified: enhanced logging
     if initializer is not None:
         initializer()
+    # \\
 
     try:
         # Initialize C side signal handlers for SIGBUS and SIGSEGV. Python signal
@@ -318,6 +322,7 @@ def _worker_loop(
                 init_exception = None
             else:
                 try:
+                    # // Modified: enhanced logging
                     batch_timeline_id = abs(hash(frozenset(index)) + time.time())
                     logging.getLogger("timeline").debug(
                         json.dumps({"item": "batch", "id": batch_timeline_id, "start_time": time.time()})
@@ -326,6 +331,7 @@ def _worker_loop(
                     logging.getLogger("timeline").debug(
                         json.dumps({"item": "batch", "id": batch_timeline_id, "end_time": time.time()})
                     )
+                    # \\
                 except Exception as e:
                     if isinstance(e, StopIteration) and dataset_kind == _DatasetKind.Iterable:
                         data = _IterableDatasetStopIteration(worker_id)

@@ -2,6 +2,8 @@ r""""Contains definitions of the methods used by the _BaseDataLoaderIter to fetc
 data from an iterable-style or map-style dataset. This logic is shared in both
 single- and multi-processing data loading.
 """
+
+# // Modified: added libraries for parallel downloads
 import asyncio
 import concurrent
 from collections import defaultdict
@@ -9,11 +11,10 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 from typing import List
 
-import torch
 from misc.time_helper import stopwatch
 from torch import Tensor
 from torch.utils.data import Dataset
-
+# \\
 
 class _BaseDatasetFetcher(object):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):
@@ -50,7 +51,9 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):
         super(_MapDatasetFetcher, self).__init__(dataset, auto_collation, collate_fn, drop_last)
 
+    # // Modified: added for logging
     @stopwatch(trace_name="(4)-mapdataset-fetcher", trace_level=4)
+    # \\
     def fetch(self, possibly_batched_index):
         if self.auto_collation:
             data = [self.dataset[idx] for idx in possibly_batched_index]
@@ -58,7 +61,7 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
             data = self.dataset[possibly_batched_index]
         return self.collate_fn(data)
 
-
+# // Modified: added two new classes to parallelize data fetching -- using Asyncio
 class _AsyncMapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(
         self, dataset: Dataset, auto_collation: bool, collate_fn: Callable, drop_last: bool, num_fetch_workers: int = 1
@@ -137,8 +140,9 @@ class _AsyncMapDatasetFetcher(_BaseDatasetFetcher):
         # create a future that waits for all tasks to complete
         result = self.loop.run_until_complete(self.initiate_fetch_tasks(batch_indices))
         return result
+# \\
 
-
+# // Modified: added two new classes to parallelize data fetching -- using multiple threads
 class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(
         self, dataset: Dataset, auto_collation: bool, collate_fn: Callable, drop_last: bool, num_fetch_workers: int = 1
@@ -202,3 +206,4 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
                 if len(collected_batches[b]) == batch_sizes[b]:
                     yield collected_batches[b], b
                     del collected_batches[b]
+# \\

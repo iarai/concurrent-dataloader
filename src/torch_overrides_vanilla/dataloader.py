@@ -25,6 +25,8 @@ import torch
 import torch.multiprocessing as multiprocessing
 from torch._six import string_classes
 from torch._utils import ExceptionWrapper
+
+# // Modified: imports that needed to be imported due to dataloader.py non standard location
 from torch.utils.data import _utils
 from torch.utils.data import BatchSampler
 from torch.utils.data import Dataset
@@ -35,6 +37,7 @@ from torch.utils.data import SequentialSampler
 from torch_overrides_vanilla.fetch import _IterableDatasetFetcher
 from torch_overrides_vanilla.fetch import _MapDatasetFetcher
 from torch_overrides_vanilla.worker import get_worker_info
+# \\
 
 T_co = TypeVar("T_co", covariant=True)
 T = TypeVar("T")

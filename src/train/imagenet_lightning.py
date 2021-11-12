@@ -30,9 +30,6 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
-from lightning_overrides import accelerator
-from lightning_overrides import precision_plugin
-from lightning_overrides import training_batch_loop
 from lightning_overrides import training_epoch_loop
 from main import get_dataset
 from main import init_benchmarking
@@ -312,24 +309,7 @@ def run_cli():
     pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.advance = (
         training_epoch_loop.TrainingEpochLoop.advance
     )
-    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop._training_step = (
-        training_batch_loop.TrainingBatchLoop._training_step
-    )
-    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop.training_step_and_backward = (
-        training_batch_loop.TrainingBatchLoop.training_step_and_backward
-    )
-    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop._training_step_and_backward_closure = (
-        training_batch_loop.TrainingBatchLoop._training_step_and_backward_closure
-    )
-    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop.backward = (
-        training_batch_loop.TrainingBatchLoop.backward
-    )
-    pytorch_lightning.accelerators.accelerator.Accelerator.batch_to_device = accelerator.Accelerator.batch_to_device
-    pytorch_lightning.accelerators.accelerator.Accelerator.training_step = accelerator.Accelerator.training_step
-    pytorch_lightning.accelerators.accelerator.Accelerator.backward = accelerator.Accelerator.backward
-    pytorch_lightning.plugins.precision.precision_plugin.PrecisionPlugin.backward = (
-        precision_plugin.PrecisionPlugin.backward
-    )
+
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
     if torch.cuda.device_count() > 0:

@@ -2,8 +2,9 @@ r""""Contains definitions of the methods used by the _BaseDataLoaderIter to fetc
 data from an iterable-style or map-style dataset. This logic is shared in both
 single- and multi-processing data loading.
 """
+# // Modified: added for logging
 from misc.time_helper import stopwatch
-
+# \\
 
 class _BaseDatasetFetcher(object):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):
@@ -22,7 +23,9 @@ class _IterableDatasetFetcher(_BaseDatasetFetcher):
         self.dataset_iter = iter(dataset)
         self.ended = False
 
+    # // Modified: added for logging
     @stopwatch(trace_name="(4)-fetcher", trace_level=4)
+    # \\
     def fetch(self, possibly_batched_index):
         if self.ended:
             raise StopIteration
@@ -46,7 +49,9 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):
         super(_MapDatasetFetcher, self).__init__(dataset, auto_collation, collate_fn, drop_last)
 
+    # // Modified: added for logging
     @stopwatch(trace_name="(4)-fetcher", trace_level=4)
+    # \\
     def fetch(self, possibly_batched_index):
         if self.auto_collation:
             data = [self.dataset[idx] for idx in possibly_batched_index]

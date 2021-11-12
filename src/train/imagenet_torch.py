@@ -50,11 +50,6 @@ parser.add_argument(
 )
 parser.add_argument("--epochs", default=20, type=int, metavar="N", help="number of total epochs to run")  # default 90
 parser.add_argument("--start-epoch", default=0, type=int, metavar="N", help="manual epoch number (useful on restarts)")
-# parser.add_argument('-b', '--batch-size', default=256, type=int,
-#                     metavar='N',
-#                     help='mini-batch size (default: 256), this is the total '
-#                          'batch size of all GPUs on the current node when '
-#                          'using Data Parallel or Distributed Data Parallel')
 parser.add_argument(
     "--lr", "--learning-rate", default=0.1, type=float, metavar="LR", help="initial learning rate", dest="lr"
 )
@@ -78,8 +73,6 @@ parser.add_argument(
     "--dist-url", default="tcp://224.66.41.62:23456", type=str, help="url used to set up distributed training"
 )
 parser.add_argument("--dist-backend", default="nccl", type=str, help="distributed backend")
-# parser.add_argument('--seed', default=None, type=int,
-#                     help='seed for initializing training. ')
 parser.add_argument("--gpu", default=2, type=int, help="GPU id to use.")
 parser.add_argument(
     "--multiprocessing-distributed",
@@ -266,17 +259,6 @@ def main_worker(gpu, ngpus_per_node, args):
             batch_pool=args.batch_pool,
             pin_memory=True if args.pin_memory == 1 else False,
         )
-    # val_loader = DataLoader(
-    #     dataset=val_dataset,
-    #     batch_size=args.batch_size,
-    #     num_workers=args.num_workers,
-    #     shuffle=False,
-    #     prefetch_factor=args.prefetch_factor,
-    #     num_fetch_workers=args.num_fetch_workers,
-    #     fetch_impl=args.fetch_impl,
-    #     batch_pool=args.batch_pool,
-    #     pin_memory=args.pin_memory,
-    # )
 
     output_base_folder = init_benchmarking(
         args=args,
