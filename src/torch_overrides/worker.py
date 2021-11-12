@@ -3,24 +3,23 @@ r""""Contains definitions of the methods used by the _BaseDataLoaderIter workers
 These **needs** to be in global scope since Py2 doesn't support serializing
 static methods.
 """
+import json
+import logging
 import os
 import queue
 import random
 import threading
+import time
 from dataclasses import dataclass
 from typing import Union
 
-import torch
+import torch.cuda
 from misc.time_helper import stopwatch
 from torch._utils import ExceptionWrapper
 from torch.utils.data._utils import HAS_NUMPY
 from torch.utils.data._utils import IS_WINDOWS
 from torch.utils.data._utils import MP_STATUS_CHECK_INTERVAL
 from torch.utils.data._utils import signal_handling
-import torch.cuda
-import logging
-import json
-import time
 
 if IS_WINDOWS:
     import ctypes
@@ -331,11 +330,9 @@ def _worker_loop(
                         batch_sizes[idx] = len(index)
                         for i in index:
                             batches[i] = idx
-                        logging.getLogger("timeline").debug(json.dumps({
-                            "item": "batch",
-                            "id": idx + start_time,
-                            "start_time": time.time()
-                        }))
+                        logging.getLogger("timeline").debug(
+                            json.dumps({"item": "batch", "id": idx + start_time, "start_time": time.time()})
+                        )
                         # take remaining ones
                         for _ in range(batch_pool):
                             # time.sleep(0.00001)
@@ -343,11 +340,11 @@ def _worker_loop(
                                 current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
                                 batch_id, batch_indices = current_batch
                                 batch_sizes[batch_id] = len(batch_indices)
-                                logging.getLogger("timeline").debug(json.dumps({
-                                    "item": "batch",
-                                    "id": batch_id + start_time,
-                                    "start_time": time.time()
-                                }))
+                                logging.getLogger("timeline").debug(
+                                    json.dumps(
+                                        {"item": "batch", "id": batch_id + start_time, "start_time": time.time()}
+                                    )
+                                )
                                 for index in batch_indices:
                                     batches[index] = batch_id
 
@@ -357,25 +354,19 @@ def _worker_loop(
                             batch.sort(key=lambda index: index["item_id"])
                             # print(f"Got batch {batch_id} ({len(batch)})")
                             b = collate_fn([b["tensor"] for b in batch])
-                            logging.getLogger("timeline").debug(json.dumps({
-                                "item": "batch",
-                                "id": batch_id + start_time,
-                                "end_time": time.time()
-                            }))
+                            logging.getLogger("timeline").debug(
+                                json.dumps({"item": "batch", "id": batch_id + start_time, "end_time": time.time()})
+                            )
                             data_queue.put((batch_id, b))
                     else:
                         timeline_batch_id = abs(hash(frozenset(index)) + time.time())
-                        logging.getLogger("timeline").debug(json.dumps({
-                            "item": "batch",
-                            "id": timeline_batch_id,
-                            "start_time": time.time()
-                        }))
+                        logging.getLogger("timeline").debug(
+                            json.dumps({"item": "batch", "id": timeline_batch_id, "start_time": time.time()})
+                        )
                         data = fetcher.fetch(index)
-                        logging.getLogger("timeline").debug(json.dumps({
-                            "item": "batch",
-                            "id": timeline_batch_id,
-                            "end_time": time.time()
-                        }))
+                        logging.getLogger("timeline").debug(
+                            json.dumps({"item": "batch", "id": timeline_batch_id, "end_time": time.time()})
+                        )
                 except Exception as e:
                     if isinstance(e, StopIteration) and dataset_kind == _DatasetKind.Iterable:
                         data = _IterableDatasetStopIteration(worker_id)

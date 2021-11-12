@@ -42,7 +42,11 @@ def parse_args_file(json_file, dataset_type):
 
 
 def get_dataset(
-    dataset: str, dataset_type: str = "val", use_cache=False, additional_args: Optional[Any] = None, limit: Optional[int] = None
+    dataset: str,
+    dataset_type: str = "val",
+    use_cache=False,
+    additional_args: Optional[Any] = None,
+    limit: Optional[int] = None,
 ):
     if dataset == "t4c":
         # TODO magic constants... extract to cli... how to do in a generic way...
@@ -66,7 +70,7 @@ def get_dataset(
             classes_file=Path(f"imagenet-{dataset_type}-classes.json"),
             limit=limit,
             endpoint_url=endpoint,
-            use_cache=use_cache
+            use_cache=use_cache,
         )
     elif dataset == "scratch":
         dataset = ScratchDataset(

@@ -26,20 +26,20 @@ from torchvision import transforms
 # TODO  #32 extract index file operations to super class and use common format for scratch and s3?
 class S3Dataset(IndexedDataset):
     def __init__(
-            self,
-            bucket_name: str,
-            # TODO #32 make this optional, use temp file if not given
-            index_file: Path,
-            classes_file: Optional[Path] = None,
-            # TODO should we support only relative paths instead of URLs?
-            index_file_download_url: Optional[str] = None,
-            classes_file_download_url: Optional[str] = None,
-            limit: int = None,
-            aws_access_key_id: Optional[str] = None,
-            aws_secret_access_key: Optional[str] = None,
-            endpoint_url: Optional[str] = None,
-            use_cache: bool = False,
-            **kwargs,
+        self,
+        bucket_name: str,
+        # TODO #32 make this optional, use temp file if not given
+        index_file: Path,
+        classes_file: Optional[Path] = None,
+        # TODO should we support only relative paths instead of URLs?
+        index_file_download_url: Optional[str] = None,
+        classes_file_download_url: Optional[str] = None,
+        limit: int = None,
+        aws_access_key_id: Optional[str] = None,
+        aws_secret_access_key: Optional[str] = None,
+        endpoint_url: Optional[str] = None,
+        use_cache: bool = False,
+        **kwargs,
     ) -> None:
         if index_file_download_url is not None and not index_file.exists():
             download_file_from_s3_url(
@@ -64,7 +64,7 @@ class S3Dataset(IndexedDataset):
         self.index_file = index_file
         self.classes_file = classes_file
         self.limit = limit
-        self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(), ])
+        self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
         self.bucket_name = bucket_name
         self.rng = None
         self.classes = None
@@ -113,7 +113,6 @@ class S3Dataset(IndexedDataset):
             https://github.com/pytorch/vision/blob/7947fc8fb38b1d3a2aca03f22a2e6a3caa63f2a0/torchvision/datasets/folder.py#L229
                 - target is class_index of the target class
         """
-        # print(f"Downloading {index}")
         class_folder_name = self.image_paths[index].split("/")[3]
         if self.classes is not None:
             # validation dataset
@@ -146,14 +145,14 @@ class S3Dataset(IndexedDataset):
 
     @staticmethod
     def index_all(
-            bucket_name: str,
-            index_file: Optional[Union[str, Path]] = None,
-            file_ending="JPEG",
-            prefix: str = "scratch/imagenet",
-            aws_access_key_id: Optional[str] = None,
-            aws_secret_access_key: Optional[str] = None,
-            endpoint_url: Optional[str] = None,
-            index_file_upload_path: Optional[Union[str, Path]] = None,
+        bucket_name: str,
+        index_file: Optional[Union[str, Path]] = None,
+        file_ending="JPEG",
+        prefix: str = "scratch/imagenet",
+        aws_access_key_id: Optional[str] = None,
+        aws_secret_access_key: Optional[str] = None,
+        endpoint_url: Optional[str] = None,
+        index_file_upload_path: Optional[Union[str, Path]] = None,
     ) -> None:
         s3_bucket = get_s3_bucket(
             bucket_name=bucket_name,
@@ -182,7 +181,7 @@ class S3Dataset(IndexedDataset):
         self.transform = transform
 
 
-def s3_to_s3_copy(from_credentials: Path, to_credentials: Path, index_file_path: Path, ) -> None:
+def s3_to_s3_copy(from_credentials: Path, to_credentials: Path, index_file_path: Path,) -> None:
     logging.info("Starting Copying ... Using S3")
 
     from_config = json.load(open(from_credentials))

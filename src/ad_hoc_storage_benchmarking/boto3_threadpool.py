@@ -38,9 +38,7 @@ for max_workers in [16, 32, 64, 128, 256]:
     payload_mb = payload / 10 ** 6
     rate_mb_sec = payload_mb * 8 / elapsed
     print(
-        f"| boto3  | {os.uname().nodename} | {max_workers:9.0f} | {payload_mb:10.2f}MB | {elapsed:10.2f}s | {rate_mb_sec:10.2f}MBit/s |"
+        f"| boto3  | {os.uname().nodename} "
+        f"| {max_workers:9.0f} | {payload_mb:10.2f}MB "
+        f"| {elapsed:10.2f}s | {rate_mb_sec:10.2f}MBit/s |"
     )
-    # print(f"max_workers{max_workers:9.f}")
-    # print(f"payload: {payload_mb:10.2f}MB")
-    # print(f"elapsed: {elapsed:10.2f}s")
-    # print(f"rate:    {rate_mb_sec:10.2f}MBit/s")

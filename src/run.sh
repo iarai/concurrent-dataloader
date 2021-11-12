@@ -111,7 +111,3 @@ for fetch_impl in "threaded" "asyncio" "vanilla" ; do
     done
   done
 done
-
-
-
-

@@ -11,28 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict, Iterator, List, Optional, Union
+import json
+import logging
+import time
+from typing import Any
+from typing import Dict
+from typing import Iterator
+from typing import List
+from typing import Optional
+from typing import Union
 
 import torch
-
+from misc.time_helper import stopwatch
 from pytorch_lightning import loops  # import as loops to avoid circular imports
 from pytorch_lightning.loops.batch import TrainingBatchLoop
 from pytorch_lightning.trainer.connectors.logger_connector.result import ResultCollection
-from pytorch_lightning.trainer.progress import Progress, SchedulerProgress
+from pytorch_lightning.trainer.progress import Progress
+from pytorch_lightning.trainer.progress import SchedulerProgress
 from pytorch_lightning.utilities.exceptions import MisconfigurationException
 from pytorch_lightning.utilities.model_helpers import is_overridden
 from pytorch_lightning.utilities.signature_utils import is_param_in_hook_signature
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 from pytorch_lightning.utilities.warnings import WarningCache
-from misc.time_helper import stopwatch
-import logging
-import json
-import time
 
 
 class TrainingEpochLoop(loops.Loop):
-    """
-    Runs over all batches in a dataloader (one epoch).
+    """Runs over all batches in a dataloader (one epoch).
 
     Args:
         min_steps: The minimum number of steps (batches) to process
@@ -71,23 +75,26 @@ class TrainingEpochLoop(loops.Loop):
     @property
     def done(self) -> bool:
         """Returns whether the training should be stopped.
+
         The criteria are that the number of steps reached the max steps,
-        the last batch is reached or the trainer signals to stop (e.g. by early stopping).
+        the last batch is reached or the trainer signals to stop (e.g.
+        by early stopping).
         """
         max_steps_reached = self.max_steps is not None and self.global_step >= self.max_steps
         return max_steps_reached or self.trainer.should_stop or self._num_training_batches_reached(self.is_last_batch)
 
     def connect(
-            self, batch_loop: Optional[TrainingBatchLoop] = None, val_loop: Optional["loops.EvaluationLoop"] = None
+        self, batch_loop: Optional[TrainingBatchLoop] = None, val_loop: Optional["loops.EvaluationLoop"] = None
     ) -> None:
-        """Optionally connect a custom batch or validation loop to this training epoch loop."""
+        """Optionally connect a custom batch or validation loop to this
+        training epoch loop."""
         if batch_loop is not None:
             self.batch_loop = batch_loop
         if val_loop is not None:
             self.val_loop = val_loop
 
     def reset(self) -> None:
-        """Resets the internal state of the loop for a new run"""
+        """Resets the internal state of the loop for a new run."""
         self.iteration_count = 0
         self.batches_seen = 0
         self.is_last_batch = False
@@ -110,7 +117,6 @@ class TrainingEpochLoop(loops.Loop):
         self.trainer.call_hook("on_train_epoch_start")
         self.trainer.fit_loop.epoch_progress.increment_started()
 
-    import time
     @stopwatch(trace_name="(6)-advance", trace_level=6)
     def advance(self, dataloader_iter: Iterator, **kwargs: Any) -> None:
         """Runs a single training batch.
@@ -122,54 +128,42 @@ class TrainingEpochLoop(loops.Loop):
             StopIteration: When the epoch is canceled by the user returning -1
         """
 
-        logging.getLogger("timeline").debug(json.dumps({
-            "item": "next_data",
-            "id": self.global_step,
-            "start_time": time.time()
-        }))
+        logging.getLogger("timeline").debug(
+            json.dumps({"item": "next_data", "id": self.global_step, "start_time": time.time()})
+        )
 
         _, (batch, is_last) = next(dataloader_iter)
         self.is_last_batch = is_last
 
-        logging.getLogger("timeline").debug(json.dumps({
-            "item": "next_data",
-            "id": self.global_step,
-            "end_time": time.time()
-        }))
+        logging.getLogger("timeline").debug(
+            json.dumps({"item": "next_data", "id": self.global_step, "end_time": time.time()})
+        )
 
         # ------------------------------------
         # TRAINING_STEP + TRAINING_STEP_END
         # ------------------------------------
         to_device_timeline_id = abs(hash(frozenset(batch)))
-        logging.getLogger("timeline").debug(json.dumps({
-            "item": "training_batch_to_device",
-            "id": to_device_timeline_id,
-            "start_time": time.time()
-        }))
+        logging.getLogger("timeline").debug(
+            json.dumps({"item": "training_batch_to_device", "id": to_device_timeline_id, "start_time": time.time()})
+        )
         with self.trainer.profiler.profile("training_batch_to_device"):
             batch = self.trainer.accelerator.batch_to_device(batch, dataloader_idx=self._dataloader_idx)
-        logging.getLogger("timeline").debug(json.dumps({
-            "item": "training_batch_to_device",
-            "id": to_device_timeline_id,
-            "end_time": time.time()
-        }))
+        logging.getLogger("timeline").debug(
+            json.dumps({"item": "training_batch_to_device", "id": to_device_timeline_id, "end_time": time.time()})
+        )
 
         self.batch_progress.increment_ready()
 
         run_training_timeline_id = abs(hash(frozenset(batch))) + time.time()
-        logging.getLogger("timeline").debug(json.dumps({
-            "item": "run_training_batch",
-            "id": run_training_timeline_id,
-            "start_time": time.time()
-        }))
+        logging.getLogger("timeline").debug(
+            json.dumps({"item": "run_training_batch", "id": run_training_timeline_id, "start_time": time.time()})
+        )
         with self.trainer.profiler.profile("run_training_batch"):
             batch_output = self.batch_loop.run(batch, self.iteration_count, self._dataloader_idx)
             self.batches_seen += 1
-        logging.getLogger("timeline").debug(json.dumps({
-            "item": "run_training_batch",
-            "id": run_training_timeline_id,
-            "end_time": time.time()
-        }))
+        logging.getLogger("timeline").debug(
+            json.dumps({"item": "run_training_batch", "id": run_training_timeline_id, "end_time": time.time()})
+        )
         self.batch_progress.increment_processed()
 
         # when returning -1 from train_step, we end epoch early
@@ -338,15 +332,17 @@ class TrainingEpochLoop(loops.Loop):
         self.trainer.lightning_module._current_fx_name = prev_fx_name
 
     def _num_training_batches_reached(self, is_last_batch: bool = False) -> bool:
-        """Checks if we are in the last batch or if there are more batches to follow."""
+        """Checks if we are in the last batch or if there are more batches to
+        follow."""
 
         # TODO: Can we combine this with training_batch_loop's arg that does a similar check?
         return self.batches_seen == self.trainer.num_training_batches or is_last_batch
 
     def _track_epoch_end_reduce_metrics(
-            self, epoch_output: List[List[STEP_OUTPUT]], batch_end_outputs: STEP_OUTPUT
+        self, epoch_output: List[List[STEP_OUTPUT]], batch_end_outputs: STEP_OUTPUT
     ) -> None:
-        """Adds the batch outputs to the epoch outputs and prepares reduction"""
+        """Adds the batch outputs to the epoch outputs and prepares
+        reduction."""
         hook_overridden = self._should_add_batch_output_to_epoch_output()
         if not hook_overridden:
             return
@@ -379,10 +375,9 @@ class TrainingEpochLoop(loops.Loop):
 
     @staticmethod
     def _prepare_outputs(
-            outputs: List[List[List["ResultCollection"]]], batch_mode: bool
+        outputs: List[List[List["ResultCollection"]]], batch_mode: bool
     ) -> Union[List[List[List[Dict]]], List[List[Dict]], List[Dict], Dict]:
-        """
-        Extract required information from batch or epoch end results.
+        """Extract required information from batch or epoch end results.
 
         Args:
             outputs: A 3-dimensional list of ``ResultCollection`` objects with dimensions:
@@ -434,7 +429,7 @@ class TrainingEpochLoop(loops.Loop):
         return processed_outputs
 
     def update_lr_schedulers(self, interval: str, update_plateau_schedulers: bool) -> None:
-        """updates the lr schedulers based on the given interval"""
+        """updates the lr schedulers based on the given interval."""
         if interval == "step" and self.batch_loop.should_accumulate():
             return
         self.trainer.optimizer_connector.update_learning_rates(
@@ -444,7 +439,7 @@ class TrainingEpochLoop(loops.Loop):
         )
 
     def _increment_accumulated_grad_global_step(self) -> None:
-        """increments global step"""
+        """increments global step."""
         num_accumulated_batches_reached = self.batch_loop._accumulated_batches_reached()
         num_training_batches_reached = self._num_training_batches_reached()
 
@@ -480,7 +475,7 @@ class TrainingEpochLoop(loops.Loop):
         return is_val_check_batch
 
     def _save_loggers_on_train_batch_end(self) -> None:
-        """Flushes loggers to disk"""
+        """Flushes loggers to disk."""
         # when loggers should save to disk
         should_flush_logs = self.trainer.logger_connector.should_flush_logs
         if should_flush_logs and self.trainer.is_global_zero and self.trainer.logger is not None:

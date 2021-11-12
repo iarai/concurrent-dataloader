@@ -1,14 +1,13 @@
+import io
 import json
 import logging
+import re
 from datetime import timedelta
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Dict
 from typing import List
-from typing import Optional
 
-import re
-import io
 import humanize
 import matplotlib
 import matplotlib.pyplot as plt
@@ -17,8 +16,6 @@ import pandas as pd
 import seaborn as sns
 import tqdm
 from pandas import DataFrame
-import numpy as np
-import seaborn as sns
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 
@@ -119,8 +116,7 @@ def get_run_stats(df: DataFrame, group_by: List[str], row_filter: Dict[str, List
         for col, items in row_filter.items():
             df = df.filter(index=col, items=items, axis=0)
     df = df.groupby(group_by + ["run"]).agg(
-        **{"downloaded data [B]": ("len", "sum"), "time_start": ("time_start", "min"),
-           "time_end": ("time_end", "max"), }
+        **{"downloaded data [B]": ("len", "sum"), "time_start": ("time_start", "min"), "time_end": ("time_end", "max"),}
     )
     df["total_elpased_time [s]"] = df["time_end"] - df["time_start"]
     df["downloaded data [MB]"] = df["downloaded data [B]"] / 10 ** 6
@@ -148,8 +144,8 @@ def get_throughputs(df: DataFrame, group_by: List[str], row_filter: Dict[str, Li
 def get_thread_stats(df: DataFrame, group_by: List[str], trace_level=5):
     s = (
         df[df["trace_level"] == trace_level]
-            .groupby("threading_ident")
-            .agg(
+        .groupby("threading_ident")
+        .agg(
             **{
                 "time_start_thread": ("time_start", "min"),
                 "time_end_thread": ("time_end", "max"),
@@ -211,7 +207,7 @@ def plot_throughput_per_storage(df, group_by: List[str]):
 
     # https://en.wikipedia.org/wiki/Data-rate_units#Megabit_per_second
     df_aggregated_over_runs["throughput [Mbit/s]"] = (
-            df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / 10 ** 6 * 8
+        df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / 10 ** 6 * 8
     )
     df_aggregated_over_runs["min_throughput"] = df_aggregated_over_runs["min_throughput"]
 
@@ -267,12 +263,9 @@ def plot_throughput_per_storage(df, group_by: List[str]):
     ax2.set_ylabel("Request time [s]")
 
 
-def plot_events_timeline(df_dataloader,
-                         color_column: str = "threading_ident",
-                         cycle=11,
-                         summary_only=False,
-                         verbose=True,
-                         ):
+def plot_events_timeline(
+    df_dataloader, color_column: str = "threading_ident", cycle=11, summary_only=False, verbose=True,
+):
     df_dataloader = df_dataloader.sort_values(
         ["pid", "trace_level", "threading_ident", "time_start"], ascending=[False, False, False, False]
     ).reset_index(drop=True)
@@ -309,11 +302,9 @@ def plot_events_timeline(df_dataloader,
     ax.margins(0.1)
 
 
-def plot_events_timeline_detailed(df_dataloader,
-                                  color_column: str = "threading_ident",
-                                  highlight_thread: int = None,
-                                  filter_function: str = None,
-                                  ):
+def plot_events_timeline_detailed(
+    df_dataloader, color_column: str = "threading_ident", highlight_thread: int = None, filter_function: str = None,
+):
     if filter_function is not None:
         df_dataloader = df_dataloader[df_dataloader["function_name"] == filter_function]
 
@@ -324,9 +315,11 @@ def plot_events_timeline_detailed(df_dataloader,
     for index, t in enumerate(np.unique(thread_ids)):
         color_list[t] = pallete[index]
         thread_runtimes[t] = max(df_dataloader[df_dataloader["threading_ident"] == t]["time_end"]) - min(
-            df_dataloader[df_dataloader["threading_ident"] == t]["time_start"])
-    df_dataloader = df_dataloader.sort_values(["pid", "threading_ident", "trace_level", "time_start"],
-                                              ascending=[False, False, False, False]).reset_index(drop=True)
+            df_dataloader[df_dataloader["threading_ident"] == t]["time_start"]
+        )
+    df_dataloader = df_dataloader.sort_values(
+        ["pid", "threading_ident", "trace_level", "time_start"], ascending=[False, False, False, False]
+    ).reset_index(drop=True)
 
     min_time = min(df_dataloader["time_start"])
     max_time = max(df_dataloader["time_end"]) - min_time
@@ -380,7 +373,7 @@ def parse_results_log(working_file_path: str) -> List[Dict]:
 
 
 def extract_pandas(
-        output_base_folder: Path, folder_filter: str = "**", filter_by_metadata: Dict[str, List[str]] = None,
+    output_base_folder: Path, folder_filter: str = "**", filter_by_metadata: Dict[str, List[str]] = None,
 ):
     files = list(output_base_folder.rglob(f"{folder_filter}/results-*.log"))
     data = []
@@ -422,14 +415,19 @@ def extract_gpu_utilization(output_base_folder: Path, folder_filter: str = "**",
     for working_file_path in tqdm.tqdm(files, total=len(folders)):
         event_acc = EventAccumulator(str(working_file_path))
         event_acc.Reload()
-        w_times, step_nums, vals = zip(*event_acc.Scalars(f'device_id: {device_id}/utilization.gpu (%)'))
-        data = data.append({"run": working_file_path.parent.parent.parent.name,
-                            "gpu": np.array(vals),
-                            "gpu_mean": np.array(vals).mean(),
-                            "gpu_median": np.median(np.array(vals)),
-                            "std": np.std(np.array(vals)),
-                            }, ignore_index=True)
+        w_times, step_nums, vals = zip(*event_acc.Scalars(f"device_id: {device_id}/utilization.gpu (%)"))
+        data = data.append(
+            {
+                "run": working_file_path.parent.parent.parent.name,
+                "gpu": np.array(vals),
+                "gpu_mean": np.array(vals).mean(),
+                "gpu_median": np.median(np.array(vals)),
+                "std": np.std(np.array(vals)),
+            },
+            ignore_index=True,
+        )
     return data
+
 
 def extract_profiling(output_base_folder: Path, folder_filter: str = "**", device_id=0):
     folders = list(output_base_folder.rglob(f"{folder_filter}"))
@@ -442,9 +440,6 @@ def extract_profiling(output_base_folder: Path, folder_filter: str = "**", devic
             lines = file.readlines()
             lines = [re.sub(r"[\n\t\s]*", "", f"{working_file_path.parent.parent.name}|" + line) for line in lines[6:]]
             text = "\n".join(lines)
-            data = data.append(pd.read_csv(io.StringIO(text), 
-                                           sep="|", 
-                                           header=None,
-                                           names=column_names))
-    data.drop('NaN', axis=1, inplace=True)
+            data = data.append(pd.read_csv(io.StringIO(text), sep="|", header=None, names=column_names))
+    data.drop("NaN", axis=1, inplace=True)
     return data

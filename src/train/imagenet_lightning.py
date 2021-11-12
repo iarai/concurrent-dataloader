@@ -13,14 +13,16 @@
 # limitations under the License.
 """This example is largely adapted from
 https://github.com/pytorch/examples/blob/master/imagenet/main.py."""
-import time
 import logging
+import time
 from argparse import ArgumentParser
 from argparse import Namespace
 from functools import partial
 from pathlib import Path
 
 import pytorch_lightning as pl
+import pytorch_lightning.accelerators
+import pytorch_lightning.loops
 import torch.nn.functional as F
 import torch.nn.parallel
 import torch.optim as optim
@@ -28,30 +30,23 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
+from lightning_overrides import accelerator
+from lightning_overrides import precision_plugin
+from lightning_overrides import training_batch_loop
+from lightning_overrides import training_epoch_loop
 from main import get_dataset
 from main import init_benchmarking
+from misc.gpulogger import GPUSidecarLogger
 from misc.logging_configuration import initialize_logging
 from misc.time_helper import stopwatch
-from misc.gpulogger import GPUSidecarLogger
+from pytorch_lightning import loggers as pl_loggers
+from pytorch_lightning.callbacks import GPUStatsMonitor
 from pytorch_lightning.core import LightningModule
 from pytorch_lightning.profiler import SimpleProfiler
-
 from torch_overrides.dataloader import DataLoader as DataLoaderParallel
 from torch_overrides.worker import _worker_loop as _worker_loop_parallel
-
 from torch_overrides_vanilla.dataloader import DataLoader as DataLoaderVanilla
 from torch_overrides_vanilla.worker import _worker_loop as _worker_loop_vanilla
-
-from pytorch_lightning.callbacks import GPUStatsMonitor
-from pytorch_lightning import loggers as pl_loggers
-
-import pytorch_lightning.loops
-import pytorch_lightning.accelerators
-
-from lightning_overrides import training_epoch_loop
-from lightning_overrides import accelerator
-from lightning_overrides import training_batch_loop
-from lightning_overrides import precision_plugin
 
 
 class ImageNetLightningModel(LightningModule):
@@ -63,21 +58,21 @@ class ImageNetLightningModel(LightningModule):
     """
 
     def __init__(
-            self,
-            train_dataloader,
-            val_dataloader,
-            data_path: str,
-            arch: str = "resnet18",
-            pretrained: bool = False,
-            lr: float = 0.1,
-            momentum: float = 0.9,
-            weight_decay: float = 1e-4,
-            batch_size: int = 4,
-            workers: int = 2,
-            **kwargs,
+        self,
+        train_dataloader,
+        val_dataloader,
+        data_path: str,
+        arch: str = "resnet18",
+        pretrained: bool = False,
+        lr: float = 0.1,
+        momentum: float = 0.9,
+        weight_decay: float = 1e-4,
+        batch_size: int = 4,
+        workers: int = 2,
+        **kwargs,
     ):
         super().__init__()
-        # self.save_hyperparameters()
+        # self.save_hyperparameters()  # noqa
         self.arch = arch
         self.pretrained = pretrained
         self.lr = lr
@@ -90,7 +85,7 @@ class ImageNetLightningModel(LightningModule):
         self._val_dataloader = val_dataloader
         self.model = models.__dict__[self.arch](pretrained=self.pretrained)
 
-    def forward(self, x):
+    def forward(self, x):  # noqa
         return self.model(x)
 
     # @stopwatch(trace_name="(6)-training_step", trace_level=6)
@@ -132,24 +127,24 @@ class ImageNetLightningModel(LightningModule):
                 res.append(correct_k.mul_(100.0 / batch_size))
             return res
 
-    def configure_optimizers(self):
+    def configure_optimizers(self):  # noqa
         optimizer = optim.SGD(self.parameters(), lr=self.lr, momentum=self.momentum, weight_decay=self.weight_decay)
         scheduler = lr_scheduler.LambdaLR(optimizer, lambda epoch: 0.1 ** (epoch // 30))
         return [optimizer], [scheduler]
 
-    def train_dataloader(self):
+    def train_dataloader(self):  # noqa
         return self._train_dataloader
 
-    def val_dataloader(self):
+    def val_dataloader(self):  # noqa
         return self._val_dataloader
 
-    def test_dataloader(self):
+    def test_dataloader(self):  # noqa
         return self._val_dataloader
 
     def test_step(self, *args, **kwargs):
         return self.validation_step(*args, **kwargs)
 
-    def test_epoch_end(self, *args, **kwargs):
+    def test_epoch_end(self, *args, **kwargs):  # noqa
         outputs = self.validation_epoch_end(*args, **kwargs)
 
         def substitute_val_keys(out):
@@ -171,15 +166,6 @@ class ImageNetLightningModel(LightningModule):
         parser.add_argument(
             "-j", "--workers", default=1, type=int, metavar="N", help="number of data loading workers (default: 4)"
         )
-        # parser.add_argument(
-        #     "-b",
-        #     "--batch-size",
-        #     default=4,
-        #     type=int,
-        #     metavar="N",
-        #     help="mini-batch size (default: 256), this is the total batch size of all GPUs on the current node"
-        #     " when using Data Parallel or Distributed Data Parallel",
-        # )
         parser.add_argument(
             "--lr", "--learning-rate", default=0.1, type=float, metavar="LR", help="initial learning rate", dest="lr"
         )
@@ -230,17 +216,6 @@ def main(args: Namespace) -> None:
             batch_pool=args.batch_pool,
             pin_memory=args.pin_memory,
         )
-    # val_data_loader = DataLoader(
-    #     dataset=val_dataset,
-    #     batch_size=args.batch_size,
-    #     num_workers=args.num_workers,
-    #     shuffle=False,
-    #     prefetch_factor=args.prefetch_factor,
-    #     num_fetch_workers=args.num_fetch_workers,
-    #     fetch_impl=args.fetch_impl,
-    #     batch_pool=args.batch_pool,
-    #     pin_memory=args.pin_memory,
-    # )
 
     output_base_folder = init_benchmarking(
         args=args,
@@ -276,25 +251,28 @@ def main(args: Namespace) -> None:
         args.workers = int(args.workers / max(1, args.gpus))
 
     model = ImageNetLightningModel(train_dataloader=train_data_loader, val_dataloader=None, **vars(args))
-    # model = ImageNetLightningModel(train_dataloader=train_data_loader, **vars(args))
-    # val_dataset.set_device(model.device)
-    # train_dataset.set_device(model.device)
-    
-    gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
-    gpu_logger.start()
 
+    if torch.cuda.device_count() > 0:
+        gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
+        gpu_logger.start()
 
     tb_logger = pl_loggers.TensorBoardLogger(f"{output_base_folder}/lightning/")
     profiler = SimpleProfiler(output_filename=f"{output_base_folder}/lightning/{time.time()}.txt")
-    trainer = pl.Trainer.from_argparse_args(args,
-                                            profiler=profiler,
-                                            logger=tb_logger,
-                                            log_every_n_steps=5,
-                                            callbacks=[GPUStatsMonitor()]
-                                            )
+    if torch.cuda.device_count() > 0:
+        trainer = pl.Trainer.from_argparse_args(
+            args,
+            profiler=profiler,
+            logger=tb_logger,
+            log_every_n_steps=5,
+            callbacks=[GPUStatsMonitor() if torch.cuda.device_count() > 0 else None],
+        )
+    else:
+        trainer = pl.Trainer.from_argparse_args(args, profiler=profiler, logger=tb_logger, log_every_n_steps=5)
 
     start_train(args, model, trainer)
-    gpu_logger.stop()
+
+    if torch.cuda.device_count() > 0 and gpu_logger is not None:
+        gpu_logger.stop()
 
 
 @stopwatch(trace_name="(8)-start_train", trace_level=8)
@@ -306,7 +284,7 @@ def start_train(args, model, trainer):
 
 
 def run_cli():
-    torch.multiprocessing.set_start_method('spawn')  # good solution !!!!
+    torch.multiprocessing.set_start_method("spawn")  # good solution !!!!
     parent_parser = ArgumentParser(add_help=False)
     parent_parser = pl.Trainer.add_argparse_args(parent_parser)
     parent_parser.add_argument("--data-path", metavar="DIR", type=str, help="path to dataset")
@@ -316,8 +294,12 @@ def run_cli():
     parent_parser.add_argument("--seed", type=int, default=42, help="seed for initializing training.")
     parent_parser.add_argument("--fetch-impl", type=str, default="asyncio", help="vanilla | threaded | asyncio")
     parent_parser.add_argument("--dataset-limit", type=int, default=60)
-    parent_parser.add_argument("--batch-pool", type=int, default=20, help="should be batch size multiplied "
-                                                                          "by a number, e.g. prefetch factor")
+    parent_parser.add_argument(
+        "--batch-pool",
+        type=int,
+        default=20,
+        help="should be batch size multiplied " "by a number, e.g. prefetch factor",
+    )
     parent_parser.add_argument("--num-fetch-workers", type=int, default=8)
     parent_parser.add_argument("--num-workers", type=int, default=4)
     parent_parser.add_argument("--prefetch-factor", type=int, default=4)
@@ -327,19 +309,33 @@ def run_cli():
     parent_parser.add_argument("--pin-memory", type=int, default=0)
     parent_parser.add_argument("--use-cache", type=int, default=0)
 
-    pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.advance = training_epoch_loop.TrainingEpochLoop.advance
-    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop._training_step = training_batch_loop.TrainingBatchLoop._training_step
-    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop.training_step_and_backward = training_batch_loop.TrainingBatchLoop.training_step_and_backward
-    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop._training_step_and_backward_closure = training_batch_loop.TrainingBatchLoop._training_step_and_backward_closure
-    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop.backward = training_batch_loop.TrainingBatchLoop.backward
+    pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.advance = (
+        training_epoch_loop.TrainingEpochLoop.advance
+    )
+    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop._training_step = (
+        training_batch_loop.TrainingBatchLoop._training_step
+    )
+    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop.training_step_and_backward = (
+        training_batch_loop.TrainingBatchLoop.training_step_and_backward
+    )
+    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop._training_step_and_backward_closure = (
+        training_batch_loop.TrainingBatchLoop._training_step_and_backward_closure
+    )
+    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop.backward = (
+        training_batch_loop.TrainingBatchLoop.backward
+    )
     pytorch_lightning.accelerators.accelerator.Accelerator.batch_to_device = accelerator.Accelerator.batch_to_device
     pytorch_lightning.accelerators.accelerator.Accelerator.training_step = accelerator.Accelerator.training_step
     pytorch_lightning.accelerators.accelerator.Accelerator.backward = accelerator.Accelerator.backward
-    pytorch_lightning.plugins.precision.precision_plugin.PrecisionPlugin.backward = precision_plugin.PrecisionPlugin.backward
+    pytorch_lightning.plugins.precision.precision_plugin.PrecisionPlugin.backward = (
+        precision_plugin.PrecisionPlugin.backward
+    )
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
-    # parser.set_defaults(deterministic=True, max_epochs=3)
-    parser.set_defaults(deterministic=True, max_epochs=20, gpus=[2])
+    if torch.cuda.device_count() > 0:
+        parser.set_defaults(deterministic=True, max_epochs=20, gpus=[2])
+    else:
+        parser.set_defaults(deterministic=True, max_epochs=3)
     args = parser.parse_args()
     main(args)
 

@@ -4,17 +4,18 @@ To support these two classes, in `./_utils` we define many utility methods and
 functions to be run in multiprocessing. E.g., the data loading worker loop is
 in `./_utils/worker.py`.
 """
+import concurrent
 import itertools
+import json
 import logging
 import multiprocessing as python_multiprocessing
-# from ray.util.multiprocessing import Pool
-from multiprocessing import Pool
 import os
-# import queue
-from torch.multiprocessing import queue  # works slightly better
-from queue import Empty
 import threading
+import time
 import warnings
+from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Pool
+from queue import Empty
 from typing import Any
 from typing import Callable
 from typing import Generic
@@ -23,16 +24,12 @@ from typing import Optional
 from typing import Sequence
 from typing import Type
 from typing import TypeVar
-import time
-import logging
-import json
-import threading
-import concurrent
-from concurrent.futures import ThreadPoolExecutor
+
 import torch
 import torch.multiprocessing as multiprocessing
 from torch._six import string_classes
 from torch._utils import ExceptionWrapper
+from torch.multiprocessing import queue  # works slightly better
 from torch.utils.data import _utils
 from torch.utils.data import BatchSampler
 from torch.utils.data import Dataset
@@ -44,8 +41,11 @@ from torch_overrides.fetch import _AsyncMapDatasetFetcher
 from torch_overrides.fetch import _IterableDatasetFetcher
 from torch_overrides.fetch import _MapDatasetFetcher
 from torch_overrides.fetch import _ThreadedMapDatasetFetcher
-from torch_overrides.worker import get_worker_info
 from torch_overrides.worker import _worker_loop
+from torch_overrides.worker import get_worker_info
+
+# from ray.util.multiprocessing import Pool
+# import queue
 
 T_co = TypeVar("T_co", covariant=True)
 T = TypeVar("T")
@@ -72,13 +72,13 @@ class _DatasetKind(object):
 
     @staticmethod
     def create_fetcher(
-            kind: "_DatasetKind",
-            dataset: Dataset,
-            auto_collation: bool,
-            collate_fn: Callable,
-            drop_last: bool,
-            fetch_impl: str,
-            num_fetch_workers: int = 1,
+        kind: "_DatasetKind",
+        dataset: Dataset,
+        auto_collation: bool,
+        collate_fn: Callable,
+        drop_last: bool,
+        fetch_impl: str,
+        num_fetch_workers: int = 1,
     ):
         if kind == _DatasetKind.Map:
             if fetch_impl == "asyncio":
@@ -201,26 +201,26 @@ class DataLoader(Generic[T_co]):
     __initialized = False
 
     def __init__(
-            self,
-            dataset: Dataset[T_co],
-            batch_size: Optional[int] = 1,
-            shuffle: bool = False,
-            sampler: Optional[Sampler[int]] = None,
-            batch_sampler: Optional[Sampler[Sequence[int]]] = None,
-            num_workers: int = 0,
-            collate_fn: Optional[_collate_fn_t] = None,
-            pin_memory: bool = False,
-            drop_last: bool = False,
-            timeout: float = 0,
-            worker_init_fn: Optional[_worker_init_fn_t] = None,
-            multiprocessing_context=None,
-            generator=None,
-            *,
-            prefetch_factor: int = 2,
-            persistent_workers: bool = False,
-            num_fetch_workers: int = 1,
-            batch_pool: int = 10,
-            fetch_impl: str = "threaded"
+        self,
+        dataset: Dataset[T_co],
+        batch_size: Optional[int] = 1,
+        shuffle: bool = False,
+        sampler: Optional[Sampler[int]] = None,
+        batch_sampler: Optional[Sampler[Sequence[int]]] = None,
+        num_workers: int = 0,
+        collate_fn: Optional[_collate_fn_t] = None,
+        pin_memory: bool = False,
+        drop_last: bool = False,
+        timeout: float = 0,
+        worker_init_fn: Optional[_worker_init_fn_t] = None,
+        multiprocessing_context=None,
+        generator=None,
+        *,
+        prefetch_factor: int = 2,
+        persistent_workers: bool = False,
+        num_fetch_workers: int = 1,
+        batch_pool: int = 10,
+        fetch_impl: str = "threaded"
     ):
         self.num_fetch_workers = num_fetch_workers
         self.batch_pool = batch_pool
@@ -395,7 +395,8 @@ class DataLoader(Generic[T_co]):
                         )
                     # error: Argument 1 to "get_context" has incompatible type "Union[str, bytes]"; expected "str"  [arg-type]
                     multiprocessing_context = multiprocessing.get_context(
-                        multiprocessing_context)  # type: ignore[arg-type]
+                        multiprocessing_context
+                    )  # type: ignore[arg-type]
 
                 if not isinstance(multiprocessing_context, python_multiprocessing.context.BaseContext):
                     raise TypeError(
@@ -418,12 +419,12 @@ class DataLoader(Generic[T_co]):
 
     def __setattr__(self, attr, val):
         if self.__initialized and attr in (
-                "batch_size",
-                "batch_sampler",
-                "sampler",
-                "drop_last",
-                "dataset",
-                "persistent_workers",
+            "batch_size",
+            "batch_sampler",
+            "sampler",
+            "drop_last",
+            "dataset",
+            "persistent_workers",
         ):
             raise ValueError(
                 "{} attribute should not be set after {} is " "initialized".format(attr, self.__class__.__name__)
@@ -616,9 +617,9 @@ class _BaseDataLoaderIter(object):
             data = self._next_data()
             self._num_yielded += 1
             if (
-                    self._dataset_kind == _DatasetKind.Iterable
-                    and self._IterableDataset_len_called is not None
-                    and self._num_yielded > self._IterableDataset_len_called
+                self._dataset_kind == _DatasetKind.Iterable
+                and self._IterableDataset_len_called is not None
+                and self._num_yielded > self._IterableDataset_len_called
             ):
                 warn_msg = (
                     "Length of IterableDataset {} was reported to be {} (when accessing len(dataloader)), but {} "
@@ -666,17 +667,13 @@ class _SingleProcessDataLoaderIter(_BaseDataLoaderIter):
     def _next_data(self):
         index = self._next_index()  # may raise StopIteration
         batch_timeline_id = abs(hash(frozenset(index)) + time.time())
-        logging.getLogger("timeline").debug(json.dumps({
-            "item": "batch",
-            "id": batch_timeline_id,
-            "start_time": time.time()
-        }))
+        logging.getLogger("timeline").debug(
+            json.dumps({"item": "batch", "id": batch_timeline_id, "start_time": time.time()})
+        )
         data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
-        logging.getLogger("timeline").debug(json.dumps({
-            "item": "batch",
-            "id": batch_timeline_id,
-            "end_time": time.time()
-        }))
+        logging.getLogger("timeline").debug(
+            json.dumps({"item": "batch", "id": batch_timeline_id, "end_time": time.time()})
+        )
         if self._pin_memory:
             data = _utils.pin_memory.pin_memory(data)
         return data
@@ -1022,7 +1019,6 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._workers_status = [False for i in range(self._num_workers)]
         self._tasks_outstanding = 0
 
-
     def start_download(self):
         self.start_data_download()
 
@@ -1101,7 +1097,6 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             # for _ in range(self._prefetch_factor * self._num_workers):
             self._try_prime_index(w, i)
             yield w
-
 
     def _reset(self, loader, first_iter=False):
         super()._reset(loader, first_iter)
@@ -1397,7 +1392,6 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._task_info[self._send_idx] = (worker_queue_idx,)
         self._tasks_outstanding += 1
         self._send_idx += 1
-
 
     def _process_data(self, data):
         self._rcvd_idx += 1

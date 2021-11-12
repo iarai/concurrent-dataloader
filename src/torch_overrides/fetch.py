@@ -9,9 +9,9 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 from typing import List
 
+import torch
 from misc.time_helper import stopwatch
 from torch import Tensor
-import torch
 from torch.utils.data import Dataset
 
 
@@ -193,7 +193,7 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
             - batch_sizes, size of each batch
         Returns
             - complete batch, as dictionary with items, batch indexes and item_ids
-        """ 
+        """
         self.items_flat = list(items.keys())
         collected_batches = defaultdict(list)
         for r in self.yield_item():

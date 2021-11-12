@@ -11,23 +11,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Callable, List, Optional, Tuple, Union
-
-import torch
-from torch import Tensor
-from torch.nn import Module
-from torch.optim import Optimizer
+from typing import Any
+from typing import Callable
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 import pytorch_lightning as pl
+import torch
 from pytorch_lightning.core.hooks import CheckpointHooks
 from pytorch_lightning.plugins.base_plugin import Plugin
 from pytorch_lightning.utilities import GradClipAlgorithmType
 from pytorch_lightning.utilities.types import _PARAMETERS
+from torch import Tensor
+from torch.nn import Module
+from torch.optim import Optimizer
 
 
 class PrecisionPlugin(Plugin, CheckpointHooks):
-    """
-    Base class for all plugins handling the precision-specific parts of the training.
+    """Base class for all plugins handling the precision-specific parts of the
+    training.
+
     The class attribute precision must be overwritten in child classes.
     The default value reflects fp32 training.
     """
@@ -35,9 +40,10 @@ class PrecisionPlugin(Plugin, CheckpointHooks):
     precision: Union[str, int] = 32
 
     def master_params(self, optimizer: Optimizer) -> _PARAMETERS:
-        """
-        The master params of the model. Returns the plain model params here.
-        Maybe different in other precision plugins.
+        """The master params of the model.
+
+        Returns the plain model params here. Maybe different in other
+        precision plugins.
         """
         for group in optimizer.param_groups:
             yield from group["params"]
@@ -45,11 +51,11 @@ class PrecisionPlugin(Plugin, CheckpointHooks):
     def connect(
         self, model: Module, optimizers: List[Optimizer], lr_schedulers: List[Any]
     ) -> Tuple[Module, List[Optimizer], List[Any]]:
-        """Connects this plugin to the accelerator and the training process"""
+        """Connects this plugin to the accelerator and the training process."""
         return model, optimizers, lr_schedulers
 
     def pre_backward(self, model: "pl.LightningModule", closure_loss: Tensor) -> Tensor:
-        """Run before precision plugin executes backward
+        """Run before precision plugin executes backward.
 
         Args:
             model: the model to be optimized
@@ -66,7 +72,7 @@ class PrecisionPlugin(Plugin, CheckpointHooks):
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """Performs the actual backpropagation
+        """Performs the actual backpropagation.
 
         Args:
             model: the model to be optimized
@@ -80,7 +86,7 @@ class PrecisionPlugin(Plugin, CheckpointHooks):
             closure_loss.backward(*args, **kwargs)
 
     def post_backward(self, model: "pl.LightningModule", closure_loss: Tensor) -> Tensor:
-        """Run after precision plugin executes backward
+        """Run after precision plugin executes backward.
 
         Args:
             model: the model to be optimized
@@ -113,7 +119,7 @@ class PrecisionPlugin(Plugin, CheckpointHooks):
         gradient_clip_algorithm: GradClipAlgorithmType = GradClipAlgorithmType.NORM,
         model: Optional[Module] = None,
     ) -> None:
-        """Clips the gradients"""
+        """Clips the gradients."""
         if clip_val is None:
             return
 
@@ -128,11 +134,11 @@ class PrecisionPlugin(Plugin, CheckpointHooks):
             self.clip_grad_by_norm(optimizer, clip_val)
 
     def clip_grad_by_value(self, optimizer: Optimizer, clip_val: Union[int, float]) -> None:
-        """Clip gradients by value"""
+        """Clip gradients by value."""
         parameters = self.master_params(optimizer)
         torch.nn.utils.clip_grad_value_(parameters, clip_value=clip_val)
 
     def clip_grad_by_norm(self, optimizer: Optimizer, clip_val: Union[int, float]) -> None:
-        """Clip gradients by norm"""
+        """Clip gradients by norm."""
         parameters = self.master_params(optimizer)
         torch.nn.utils.clip_grad_norm_(parameters, clip_val)

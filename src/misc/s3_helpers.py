@@ -37,8 +37,9 @@ def get_s3_bucket(
                 s3_client = boto3_module.resource(
                     "s3",
                     endpoint_url=endpoint_url,
-                    config=botocore_module.client.Config(max_pool_connections=max_pool_connections,
-                                                         signature_version=botocore_module.UNSIGNED),
+                    config=botocore_module.client.Config(
+                        max_pool_connections=max_pool_connections, signature_version=botocore_module.UNSIGNED
+                    ),
                 )
         except BaseException:
             s3_client = None
@@ -65,6 +66,7 @@ def upload_file_to_s3_url(
         endpoint_url=endpoint_url,
     )
     s3_bucket.upload_file(str(f), s3_loc.path)
+
 
 def download_file_from_s3_url(
     f: Union[str, Path],

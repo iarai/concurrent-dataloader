@@ -73,7 +73,6 @@ class ScratchDataset(IndexedDataset):
 
     def set_device(self, device):
         pass
-        # self.device = device
 
     def __len__(self) -> int:
         if self.limit is None:
