@@ -19,7 +19,7 @@ Use as:
 
 ```
 cd src
-export **PYTHONPATH=$PWD**
+export PYTHONPATH=$PWD
 python benchmark/benchmark_tensor_loading.py -a random_gpu
 python benchmark/benchmark_tensor_loading.py -a random_to_gpu
 python benchmark/benchmark_tensor_loading.py -a single_image

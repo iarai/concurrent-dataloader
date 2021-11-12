@@ -6,6 +6,7 @@ static methods.
 import os
 import queue
 import random
+import threading
 from dataclasses import dataclass
 from typing import Union
 
@@ -16,6 +17,10 @@ from torch.utils.data._utils import HAS_NUMPY
 from torch.utils.data._utils import IS_WINDOWS
 from torch.utils.data._utils import MP_STATUS_CHECK_INTERVAL
 from torch.utils.data._utils import signal_handling
+import torch.cuda
+import logging
+import json
+import time
 
 if IS_WINDOWS:
     import ctypes
@@ -231,7 +236,8 @@ def _worker_loop(
     persistent_workers,
     fetch_impl,
     num_fetch_workers,
-    batch_pool=10,
+    batch_pool=10,  # number of batches to fetch simultaneously
+    start_time=None,
     initializer=None,
 ):
     if initializer is not None:
@@ -287,7 +293,6 @@ def _worker_loop(
         # `iteration_end` is set, we skip all processing step and just wait for
         # `None`.
         iteration_end = False
-
         watchdog = ManagerWatchdog()
         while watchdog.is_alive():
             try:
@@ -326,22 +331,51 @@ def _worker_loop(
                         batch_sizes[idx] = len(index)
                         for i in index:
                             batches[i] = idx
+                        logging.getLogger("timeline").debug(json.dumps({
+                            "item": "batch",
+                            "id": idx + start_time,
+                            "start_time": time.time()
+                        }))
                         # take remaining ones
                         for _ in range(batch_pool):
+                            # time.sleep(0.00001)
                             if not index_queue.empty():
                                 current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
                                 batch_id, batch_indices = current_batch
                                 batch_sizes[batch_id] = len(batch_indices)
+                                logging.getLogger("timeline").debug(json.dumps({
+                                    "item": "batch",
+                                    "id": batch_id + start_time,
+                                    "start_time": time.time()
+                                }))
                                 for index in batch_indices:
                                     batches[index] = batch_id
 
+                        # logging.getLogger("stopwatch").debug(json.dumps(data))
                         for batch, batch_id in fetcher.yield_batch(items=batches, batch_sizes=batch_sizes):
+                            time.sleep(0.0001)
                             batch.sort(key=lambda index: index["item_id"])
                             # print(f"Got batch {batch_id} ({len(batch)})")
-                            b = [b["tensor"] for b in batch]
+                            b = collate_fn([b["tensor"] for b in batch])
+                            logging.getLogger("timeline").debug(json.dumps({
+                                "item": "batch",
+                                "id": batch_id + start_time,
+                                "end_time": time.time()
+                            }))
                             data_queue.put((batch_id, b))
                     else:
+                        timeline_batch_id = abs(hash(frozenset(index)) + time.time())
+                        logging.getLogger("timeline").debug(json.dumps({
+                            "item": "batch",
+                            "id": timeline_batch_id,
+                            "start_time": time.time()
+                        }))
                         data = fetcher.fetch(index)
+                        logging.getLogger("timeline").debug(json.dumps({
+                            "item": "batch",
+                            "id": timeline_batch_id,
+                            "end_time": time.time()
+                        }))
                 except Exception as e:
                     if isinstance(e, StopIteration) and dataset_kind == _DatasetKind.Iterable:
                         data = _IterableDatasetStopIteration(worker_id)

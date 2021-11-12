@@ -7,19 +7,28 @@ in `./_utils/worker.py`.
 import itertools
 import logging
 import multiprocessing as python_multiprocessing
+# from ray.util.multiprocessing import Pool
+from multiprocessing import Pool
 import os
-import queue
+# import queue
+from torch.multiprocessing import queue  # works slightly better
+from queue import Empty
 import threading
 import warnings
 from typing import Any
 from typing import Callable
-from typing import Type
 from typing import Generic
 from typing import List
 from typing import Optional
 from typing import Sequence
+from typing import Type
 from typing import TypeVar
-
+import time
+import logging
+import json
+import threading
+import concurrent
+from concurrent.futures import ThreadPoolExecutor
 import torch
 import torch.multiprocessing as multiprocessing
 from torch._six import string_classes
@@ -36,6 +45,7 @@ from torch_overrides.fetch import _IterableDatasetFetcher
 from torch_overrides.fetch import _MapDatasetFetcher
 from torch_overrides.fetch import _ThreadedMapDatasetFetcher
 from torch_overrides.worker import get_worker_info
+from torch_overrides.worker import _worker_loop
 
 T_co = TypeVar("T_co", covariant=True)
 T = TypeVar("T")
@@ -45,7 +55,6 @@ _worker_init_fn_t = Callable[[int], None]
 # type parameter set to a default value if the user doesn't pass in a custom 'collate_fn'.
 # See https://github.com/python/mypy/issues/3737.
 _collate_fn_t = Callable[[List[T]], Any]
-
 
 # This function used to be defined in this file. However, it was moved to
 # _utils/collate.py. Although it is rather hard to access this from user land
@@ -62,9 +71,15 @@ class _DatasetKind(object):
     Iterable = 1
 
     @staticmethod
-    def create_fetcher(kind: "_DatasetKind", dataset: Dataset, auto_collation: bool, collate_fn: Callable, drop_last: bool,
-                       fetch_impl: str,
-                       num_fetch_workers: int = 1):
+    def create_fetcher(
+            kind: "_DatasetKind",
+            dataset: Dataset,
+            auto_collation: bool,
+            collate_fn: Callable,
+            drop_last: bool,
+            fetch_impl: str,
+            num_fetch_workers: int = 1,
+    ):
         if kind == _DatasetKind.Map:
             if fetch_impl == "asyncio":
                 return _AsyncMapDatasetFetcher(dataset, auto_collation, collate_fn, drop_last, num_fetch_workers)
@@ -186,26 +201,26 @@ class DataLoader(Generic[T_co]):
     __initialized = False
 
     def __init__(
-        self,
-        dataset: Dataset[T_co],
-        batch_size: Optional[int] = 1,
-        shuffle: bool = False,
-        sampler: Optional[Sampler[int]] = None,
-        batch_sampler: Optional[Sampler[Sequence[int]]] = None,
-        num_workers: int = 0,
-        collate_fn: Optional[_collate_fn_t] = None,
-        pin_memory: bool = False,
-        drop_last: bool = False,
-        timeout: float = 0,
-        worker_init_fn: Optional[_worker_init_fn_t] = None,
-        multiprocessing_context=None,
-        generator=None,
-        *,
-        prefetch_factor: int = 2,
-        persistent_workers: bool = False,
-        num_fetch_workers: int = 1,
-        batch_pool: int = 10,
-        fetch_impl: str = "threaded"
+            self,
+            dataset: Dataset[T_co],
+            batch_size: Optional[int] = 1,
+            shuffle: bool = False,
+            sampler: Optional[Sampler[int]] = None,
+            batch_sampler: Optional[Sampler[Sequence[int]]] = None,
+            num_workers: int = 0,
+            collate_fn: Optional[_collate_fn_t] = None,
+            pin_memory: bool = False,
+            drop_last: bool = False,
+            timeout: float = 0,
+            worker_init_fn: Optional[_worker_init_fn_t] = None,
+            multiprocessing_context=None,
+            generator=None,
+            *,
+            prefetch_factor: int = 2,
+            persistent_workers: bool = False,
+            num_fetch_workers: int = 1,
+            batch_pool: int = 10,
+            fetch_impl: str = "threaded"
     ):
         self.num_fetch_workers = num_fetch_workers
         self.batch_pool = batch_pool
@@ -231,9 +246,16 @@ class DataLoader(Generic[T_co]):
             raise ValueError("persistent_workers option needs num_workers > 0")
 
         self.dataset = dataset
+
+        # cannot have _SingleProcessDataLoaderIter for threaded implementation
         self.num_workers = num_workers
+        if self.num_workers == 0 and fetch_impl == "threaded":
+            self.num_workers = 1
         self.prefetch_factor = prefetch_factor
-        self.pin_memory = pin_memory
+        if pin_memory == 0:
+            self.pin_memory = False
+        else:
+            self.pin_memory = True
         self.timeout = timeout
         self.worker_init_fn = worker_init_fn
         self.multiprocessing_context = multiprocessing_context
@@ -350,7 +372,8 @@ class DataLoader(Generic[T_co]):
             return _SingleProcessDataLoaderIter(self)
         else:
             self.check_worker_number_rationality()
-            return _MultiProcessingDataLoaderIter(self)
+            iter = _MultiProcessingDataLoaderIter(self)
+            return iter
 
     @property
     def multiprocessing_context(self):
@@ -371,7 +394,8 @@ class DataLoader(Generic[T_co]):
                             ).format(valid_start_methods, multiprocessing_context)
                         )
                     # error: Argument 1 to "get_context" has incompatible type "Union[str, bytes]"; expected "str"  [arg-type]
-                    multiprocessing_context = multiprocessing.get_context(multiprocessing_context)  # type: ignore[arg-type]
+                    multiprocessing_context = multiprocessing.get_context(
+                        multiprocessing_context)  # type: ignore[arg-type]
 
                 if not isinstance(multiprocessing_context, python_multiprocessing.context.BaseContext):
                     raise TypeError(
@@ -394,12 +418,12 @@ class DataLoader(Generic[T_co]):
 
     def __setattr__(self, attr, val):
         if self.__initialized and attr in (
-            "batch_size",
-            "batch_sampler",
-            "sampler",
-            "drop_last",
-            "dataset",
-            "persistent_workers",
+                "batch_size",
+                "batch_sampler",
+                "sampler",
+                "drop_last",
+                "dataset",
+                "persistent_workers",
         ):
             raise ValueError(
                 "{} attribute should not be set after {} is " "initialized".format(attr, self.__class__.__name__)
@@ -415,11 +439,14 @@ class DataLoader(Generic[T_co]):
         # However, in the case of a multiple workers iterator
         # the iterator is only created once in the lifetime of the
         # DataLoader object so that workers can be reused
+
+        # coming from next in advance
         if self.persistent_workers and self.num_workers > 0:
             if self._iterator is None:
                 self._iterator = self._get_iterator()
             else:
                 self._iterator._reset(self)
+                # returning iterator
             return self._iterator
         else:
             return self._get_iterator()
@@ -577,16 +604,21 @@ class _BaseDataLoaderIter(object):
     def _next_data(self):
         raise NotImplementedError
 
+    def start_download(self):
+        raise NotImplementedError
+
     def __next__(self) -> Any:
+        self.start_download()
+
         with torch.autograd.profiler.record_function(self._profile_name):
             if self._sampler_iter is None:
                 self._reset()
             data = self._next_data()
             self._num_yielded += 1
             if (
-                self._dataset_kind == _DatasetKind.Iterable
-                and self._IterableDataset_len_called is not None
-                and self._num_yielded > self._IterableDataset_len_called
+                    self._dataset_kind == _DatasetKind.Iterable
+                    and self._IterableDataset_len_called is not None
+                    and self._num_yielded > self._IterableDataset_len_called
             ):
                 warn_msg = (
                     "Length of IterableDataset {} was reported to be {} (when accessing len(dataloader)), but {} "
@@ -633,7 +665,18 @@ class _SingleProcessDataLoaderIter(_BaseDataLoaderIter):
 
     def _next_data(self):
         index = self._next_index()  # may raise StopIteration
+        batch_timeline_id = abs(hash(frozenset(index)) + time.time())
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "batch",
+            "id": batch_timeline_id,
+            "start_time": time.time()
+        }))
         data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "batch",
+            "id": batch_timeline_id,
+            "end_time": time.time()
+        }))
         if self._pin_memory:
             data = _utils.pin_memory.pin_memory(data)
         return data
@@ -948,12 +991,12 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #     `None` from `index_queue`, but it allows us to skip wasting resources
     #     processing indices already in `index_queue` if we are already shutting
     #     down.
-
     def __init__(self, loader):
         super(_MultiProcessingDataLoaderIter, self).__init__(loader)
-
         assert self._num_workers > 0
         assert self._prefetch_factor > 0
+
+        self.download_in_progress = False
 
         if loader.multiprocessing_context is None:
             multiprocessing_context = multiprocessing
@@ -968,16 +1011,62 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._shutdown = False
         self._workers_done_event = multiprocessing_context.Event()
 
-        self._index_queues = []
+        self.loader = loader
+        self.multiprocessing_context = multiprocessing_context
+
         self._workers = []
+        self._index_queues = []
+        self._task_info = {}
+        self._send_idx = 0
+        self._rcvd_idx = 0
+        self._workers_status = [False for i in range(self._num_workers)]
+        self._tasks_outstanding = 0
+
+
+    def start_download(self):
+        self.start_data_download()
+
+    def start_data_download(self):
+        for w in self.get_data():
+            if self._pin_memory:
+                self._pin_memory_thread_done_event = threading.Event()
+                # Queue is not type-annotated
+                self._data_queue = queue.Queue()  # type: ignore[var-annotated]
+                # self._data_queue = self.multiprocessing_context.Queue()  # type: ignore[var-annotated]
+                pin_memory_thread = threading.Thread(
+                    target=_utils.pin_memory._pin_memory_loop,
+                    args=(
+                        self._worker_result_queue,
+                        self._data_queue,
+                        torch.cuda.current_device(),
+                        self._pin_memory_thread_done_event,
+                    ),
+                )
+                pin_memory_thread.daemon = True
+                pin_memory_thread.start()
+                # Similar to workers (see comment above), we only register
+                # pin_memory_thread once it is started.
+                self._pin_memory_thread = pin_memory_thread
+            else:
+                self._data_queue = self._worker_result_queue
+            self._worker_pids_set = False
+            # self._reset(loader, first_iter=True)
+            # yield
+
+    def get_data(self):
+        if self.download_in_progress:
+            return
+        self.download_in_progress = True
         for i in range(self._num_workers):
             # No certainty which module multiprocessing_context is
-            index_queue = multiprocessing_context.Queue()  # type: ignore[var-annotated]
+            index_queue = self.multiprocessing_context.Queue()  # type: ignore[var-annotated]
             # Need to `cancel_join_thread` here!
             # See sections (2) and (3b) above.
             index_queue.cancel_join_thread()
-            w = multiprocessing_context.Process(
-                target=_utils.worker._worker_loop,
+            # this is slow!
+            t = time.time()
+            w = self.multiprocessing_context.Process(
+                target=torch.utils.data._utils.worker._worker_loop,
                 args=(
                     self._dataset_kind,
                     self._dataset,
@@ -992,9 +1081,10 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                     i,
                     self._num_workers,
                     self._persistent_workers,
-                    loader.fetch_impl,
-                    loader.num_fetch_workers,
-                    loader.batch_pool,
+                    self.loader.fetch_impl,
+                    self.loader.num_fetch_workers,
+                    self.loader.batch_pool,
+                    t,
                 ),
             )
             w.daemon = True
@@ -1007,34 +1097,11 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             w.start()
             self._index_queues.append(index_queue)
             self._workers.append(w)
+            # for _ in range(self.loader.batch_pool // (self.loader.batch_size // self.loader.num_workers)):
+            # for _ in range(self._prefetch_factor * self._num_workers):
+            self._try_prime_index(w, i)
+            yield w
 
-        if self._pin_memory:
-            self._pin_memory_thread_done_event = threading.Event()
-
-            # Queue is not type-annotated
-            self._data_queue = queue.Queue()  # type: ignore[var-annotated]
-            pin_memory_thread = threading.Thread(
-                target=_utils.pin_memory._pin_memory_loop,
-                args=(
-                    self._worker_result_queue,
-                    self._data_queue,
-                    torch.cuda.current_device(),
-                    self._pin_memory_thread_done_event,
-                ),
-            )
-            pin_memory_thread.daemon = True
-            pin_memory_thread.start()
-            # Similar to workers (see comment above), we only register
-            # pin_memory_thread once it is started.
-            self._pin_memory_thread = pin_memory_thread
-        else:
-            self._data_queue = self._worker_result_queue
-
-        # .pid can be None only before process is spawned (not the case, so ignore)
-        _utils.signal_handling._set_worker_pids(id(self), tuple(w.pid for w in self._workers))  # type: ignore[misc]
-        _utils.signal_handling._set_SIGCHLD_handler()
-        self._worker_pids_set = True
-        self._reset(loader, first_iter=True)
 
     def _reset(self, loader, first_iter=False):
         super()._reset(loader, first_iter)
@@ -1081,6 +1148,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         #   (bool: whether successfully get data, any: data if successful else None)
         try:
             data = self._data_queue.get(timeout=timeout)
+            # data = self._data_queue.get_nowait()
             return (True, data)
         except Exception as e:
             # At timeout and error, we manually check whether any worker has
@@ -1094,7 +1162,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             if len(failed_workers) > 0:
                 pids_str = ", ".join(str(w.pid) for w in failed_workers)
                 raise RuntimeError("DataLoader worker (pid(s) {}) exited unexpectedly".format(pids_str)) from e
-            if isinstance(e, queue.Empty):
+            if isinstance(e, Empty):
                 return (False, None)
             import tempfile
             import errno
@@ -1297,9 +1365,23 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                 del self._task_info[idx]
                 return self._process_data(data)
 
-    def _try_put_index(self):
-        assert self._tasks_outstanding < self._prefetch_factor * self._num_workers
+    def _try_prime_index(self, worker, id):
+        # print(f"Outstanding tasks: {self._tasks_outstanding}")
+        # assert self._tasks_outstanding < self._prefetch_factor * self._num_workers
+        try:
+            index = self._next_index()
+        except StopIteration:
+            return
+        worker_queue_idx = id
+        self._workers_status[id] = True
+        self._index_queues[worker_queue_idx].put((self._send_idx, index))
+        self._task_info[self._send_idx] = (worker_queue_idx,)
+        self._tasks_outstanding += 1
+        self._send_idx += 1
 
+    def _try_put_index(self):
+        # return # not necessary?
+        assert self._tasks_outstanding < self._prefetch_factor * self._num_workers
         try:
             index = self._next_index()
         except StopIteration:
@@ -1311,11 +1393,11 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         else:
             # not found (i.e., didn't break)
             return
-
         self._index_queues[worker_queue_idx].put((self._send_idx, index))
         self._task_info[self._send_idx] = (worker_queue_idx,)
         self._tasks_outstanding += 1
         self._send_idx += 1
+
 
     def _process_data(self, data):
         self._rcvd_idx += 1
