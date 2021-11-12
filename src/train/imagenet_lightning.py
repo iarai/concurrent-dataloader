@@ -339,7 +339,7 @@ def run_cli():
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
     # parser.set_defaults(deterministic=True, max_epochs=3)
-    parser.set_defaults(deterministic=True, max_epochs=10, gpus=[2])
+    parser.set_defaults(deterministic=True, max_epochs=20, gpus=[2])
     args = parser.parse_args()
     main(args)
 

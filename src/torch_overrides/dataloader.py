@@ -1066,7 +1066,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             # this is slow!
             t = time.time()
             w = self.multiprocessing_context.Process(
-                target=_worker_loop,
+                target=torch.utils.data._utils.worker._worker_loop,
                 args=(
                     self._dataset_kind,
                     self._dataset,

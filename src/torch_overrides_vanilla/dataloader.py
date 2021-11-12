@@ -987,7 +987,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             # See sections (2) and (3b) above.
             index_queue.cancel_join_thread()
             w = multiprocessing_context.Process(
-                target=_worker_loop,
+                target=torch.utils.data._utils.worker._worker_loop,
                 args=(self._dataset_kind,
                       self._dataset,
                       index_queue,
