@@ -1,5 +1,7 @@
+import io
 import json
 import logging
+import re
 from datetime import timedelta
 from json import JSONDecodeError
 from pathlib import Path
@@ -11,8 +13,10 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import tqdm
 from pandas import DataFrame
+from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 
 def plot_all(df: DataFrame, function_name: str, group_by: List[str], plot_max=True, log_scale=True, figsize=(50, 50)):
@@ -137,9 +141,9 @@ def get_throughputs(df: DataFrame, group_by: List[str], row_filter: Dict[str, Li
     return df
 
 
-def get_thread_stats(df: DataFrame, group_by: List[str]):
+def get_thread_stats(df: DataFrame, group_by: List[str], trace_level=5):
     s = (
-        df[df["trace_level"] == 5]
+        df[df["trace_level"] == trace_level]
         .groupby("threading_ident")
         .agg(
             **{
@@ -259,17 +263,25 @@ def plot_throughput_per_storage(df, group_by: List[str]):
     ax2.set_ylabel("Request time [s]")
 
 
-def plot_events_timeline(df_dataloader, color_column: str = "threading_ident", cycle=11):
+def plot_events_timeline(
+    df_dataloader, color_column: str = "threading_ident", cycle=11, summary_only=False, verbose=True,
+):
     df_dataloader = df_dataloader.sort_values(
         ["pid", "trace_level", "threading_ident", "time_start"], ascending=[False, False, False, False]
     ).reset_index(drop=True)
 
     total_elapsed = df_dataloader["time_end"].max() - df_dataloader["time_start"].min()
     total_bytes = df_dataloader["len"].sum()
-    print(f"total_elapsed={timedelta(seconds=total_elapsed)}")
-    print(f"total_bytes={humanize.naturalsize(total_bytes)}")
-    print(f"overall rate {humanize.naturalsize(total_bytes / total_elapsed)}/s")
-    print(f"overall rate {humanize.naturalsize(total_bytes / total_elapsed * 8)}it/s")
+    overall_rate_mbps = {humanize.naturalsize(total_bytes / total_elapsed)}
+    overall_rate_mbitps = {humanize.naturalsize(total_bytes / total_elapsed * 8)}
+    if verbose:
+        print(f"total_elapsed={timedelta(seconds=total_elapsed)}")
+        print(f"total_bytes={humanize.naturalsize(total_bytes)}")
+        print(f"overall rate {overall_rate_mbps}/s")
+        print(f"overall rate {overall_rate_mbitps}it/s")
+
+    if summary_only:
+        return overall_rate_mbps, overall_rate_mbitps
 
     dict_dataloader = df_dataloader.to_dict("index")
     threading_idents = {d[color_column] for d in dict_dataloader.values()}
@@ -290,6 +302,62 @@ def plot_events_timeline(df_dataloader, color_column: str = "threading_ident", c
     ax.margins(0.1)
 
 
+def plot_events_timeline_detailed(
+    df_dataloader, color_column: str = "threading_ident", highlight_thread: int = None, filter_function: str = None,
+):
+    if filter_function is not None:
+        df_dataloader = df_dataloader[df_dataloader["function_name"] == filter_function]
+
+    color_list = {}
+    thread_ids = np.array(list(df_dataloader["threading_ident"]))
+    pallete = sns.color_palette(None, len(np.unique(thread_ids)))
+    thread_runtimes = {}
+    for index, t in enumerate(np.unique(thread_ids)):
+        color_list[t] = pallete[index]
+        thread_runtimes[t] = max(df_dataloader[df_dataloader["threading_ident"] == t]["time_end"]) - min(
+            df_dataloader[df_dataloader["threading_ident"] == t]["time_start"]
+        )
+    df_dataloader = df_dataloader.sort_values(
+        ["pid", "threading_ident", "trace_level", "time_start"], ascending=[False, False, False, False]
+    ).reset_index(drop=True)
+
+    min_time = min(df_dataloader["time_start"])
+    max_time = max(df_dataloader["time_end"]) - min_time
+
+    dict_dataloader = df_dataloader.to_dict("index")
+    print(len(dict_dataloader.items()))
+
+    colors = []
+    lines = []
+    texts = []
+    for index, t in enumerate(np.unique(thread_ids)):
+        last_i = 0
+        for i, (_, param_series) in enumerate(dict_dataloader.items()):
+            if param_series["threading_ident"] == t:
+                last_i = i
+                lines.append([(param_series["time_start"] - min_time, i), (param_series["time_end"] - min_time, i)])
+                if highlight_thread is not None:
+                    if param_series["threading_ident"] == highlight_thread:
+                        colors.append("black")
+                    else:
+                        colors.append("red")
+                else:
+                    colors.append(color_list[param_series["threading_ident"]])
+        lines.append([(0, last_i), (max_time, last_i)])
+        texts.append((thread_runtimes[t], 0, last_i))
+        colors.append("silver")
+
+    print(f"Lines num: {len(lines)}")
+
+    lc = matplotlib.collections.LineCollection(lines, colors=colors, linewidths=2)
+    fig, ax = plt.subplots(figsize=(50, 50))
+    ax.add_collection(lc)
+    for i in texts:
+        ax.text(i[1], i[2], i[0])
+    ax.autoscale()
+    ax.margins(0.1)
+
+
 def parse_results_log(working_file_path: str) -> List[Dict]:
     with open(working_file_path, "r") as f:
         skipped_lines_count = 0
@@ -300,7 +368,7 @@ def parse_results_log(working_file_path: str) -> List[Dict]:
             except JSONDecodeError:
                 skipped_lines_count += 1
     if skipped_lines_count > 0:
-        logging.warning("Skipped %s lines while reading %s", skipped_lines_count, working_file_path)
+        logging.warning("Skipped %s lines while readinget_thread_statsg %s", skipped_lines_count, working_file_path)
     return data
 
 
@@ -322,9 +390,10 @@ def extract_pandas(
         results = pd.DataFrame.from_records(data=results)
 
         for k, v in metadata.items():
-            results[k] = v
             if not isinstance(v, (int, float, complex)):
                 results[k] = str(v)
+            else:
+                results[k] = v
 
         results["source_file"] = working_file_path
         results["run"] = working_file_path.parent.name
@@ -337,3 +406,40 @@ def extract_pandas(
     df = pd.concat(data)
     df.groupby
     return df
+
+
+def extract_gpu_utilization(output_base_folder: Path, folder_filter: str = "**", device_id=0):
+    folders = list(output_base_folder.rglob(f"{folder_filter}"))
+    files = output_base_folder.rglob(f"{folder_filter}/lightning/default/version_0")
+    data = pd.DataFrame()
+    for working_file_path in tqdm.tqdm(files, total=len(folders)):
+        event_acc = EventAccumulator(str(working_file_path))
+        event_acc.Reload()
+        w_times, step_nums, vals = zip(*event_acc.Scalars(f"device_id: {device_id}/utilization.gpu (%)"))
+        data = data.append(
+            {
+                "run": working_file_path.parent.parent.parent.name,
+                "gpu": np.array(vals),
+                "gpu_mean": np.array(vals).mean(),
+                "gpu_median": np.median(np.array(vals)),
+                "std": np.std(np.array(vals)),
+            },
+            ignore_index=True,
+        )
+    return data
+
+
+def extract_profiling(output_base_folder: Path, folder_filter: str = "**", device_id=0):
+    folders = list(output_base_folder.rglob(f"{folder_filter}"))
+    files = output_base_folder.rglob(f"{folder_filter}/lightning/*.txt")
+    print(files)
+    data = pd.DataFrame()
+    column_names = ["run", "function", "mean_duration", "num_calls", "total_time", "percentage", "NaN"]
+    for working_file_path in tqdm.tqdm(files, total=len(folders)):
+        with open(working_file_path) as file:
+            lines = file.readlines()
+            lines = [re.sub(r"[\n\t\s]*", "", f"{working_file_path.parent.parent.name}|" + line) for line in lines[6:]]
+            text = "\n".join(lines)
+            data = data.append(pd.read_csv(io.StringIO(text), sep="|", header=None, names=column_names))
+    data.drop("NaN", axis=1, inplace=True)
+    return data

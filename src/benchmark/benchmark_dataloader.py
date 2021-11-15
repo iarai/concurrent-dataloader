@@ -101,15 +101,15 @@ def handle_arguments() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_base_folder", type=Path, default=Path("benchmark_output"))
     parser.add_argument("--dataset", type=str, default="s3")
-    parser.add_argument("--batch_size", type=int, default=10, help="Additional arguments")
-    parser.add_argument("--num_workers", type=int, default=1, help="Additional arguments")
+    parser.add_argument("--batch_size", type=int, default=16, help="Additional arguments")
+    parser.add_argument("--num_workers", type=int, default=0, help="Additional arguments")
     parser.add_argument(
         "--data_loader_type", type=str, default="sync", help="sync/async, async is CUDA stream processing"
     )
-    parser.add_argument("--num_fetch_workers", type=int, default=16, help="Additional arguments")
+    parser.add_argument("--num_fetch_workers", type=int, default=4, help="Additional arguments")
     parser.add_argument("--prefetch_factor", type=int, default=2, help="Additional arguments")
     parser.add_argument("--repeat", type=int, default=1, help="Additional arguments")
-    parser.add_argument("--num_batches", type=int, default=1, help="None means full dataset")
+    parser.add_argument("--num_batches", type=int, default=10, help="None means full dataset")
     parser.add_argument("--shuffle", type=bool, default=True, help="Additional arguments")
     parser.add_argument("--fetch_impl", type=str, default="threaded", help="threaded, asyncio, vanilla")
     parser.add_argument("--batch_pool", type=int, default=10, help="Batch pool to collect together")
@@ -119,7 +119,6 @@ def handle_arguments() -> argparse.ArgumentParser:
 def main(*args):
     parser = handle_arguments()
     args = parser.parse_args(args)
-
     output_base_folder = init_benchmarking(
         args=args,
         action="_".join(
