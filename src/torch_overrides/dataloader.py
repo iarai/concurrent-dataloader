@@ -623,7 +623,7 @@ class _BaseDataLoaderIter(object):
 
     def __next__(self) -> Any:
         # // Modified: start data download once the data is requested for the first time
-        self.start_download()
+        # self.start_download()
         # \\
 
         with torch.autograd.profiler.record_function(self._profile_name):
@@ -1009,12 +1009,10 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #     down.
     def __init__(self, loader):
         super(_MultiProcessingDataLoaderIter, self).__init__(loader)
+
         assert self._num_workers > 0
         assert self._prefetch_factor > 0
-
-        # // Modified: flag for checking whether the worker already started fetching data
-        self.download_in_progress = False
-        # \\
+        self.loader = loader
 
         if loader.multiprocessing_context is None:
             multiprocessing_context = multiprocessing
@@ -1029,63 +1027,16 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._shutdown = False
         self._workers_done_event = multiprocessing_context.Event()
 
-        # // Modified: moved process creation outside the constructor
-        self.loader = loader
-        self.multiprocessing_context = multiprocessing_context
-
-        self._workers = []
         self._index_queues = []
-        self._task_info = {}
-        self._send_idx = 0
-        self._rcvd_idx = 0
-        self._workers_status = [False for i in range(self._num_workers)]
-        self._tasks_outstanding = 0
-        # \\
-
-    # // Modified: function that initializes process creation and starts data fetching
-    def start_download(self):
-        self.start_data_download()
-
-    def start_data_download(self):
-        for w in self.get_data():
-            if self._pin_memory:
-                self._pin_memory_thread_done_event = threading.Event()
-                # Queue is not type-annotated
-                self._data_queue = queue.Queue()  # type: ignore[var-annotated]
-                # self._data_queue = self.multiprocessing_context.Queue()  # type: ignore[var-annotated]
-                pin_memory_thread = threading.Thread(
-                    target=_utils.pin_memory._pin_memory_loop,
-                    args=(
-                        self._worker_result_queue,
-                        self._data_queue,
-                        torch.cuda.current_device(),
-                        self._pin_memory_thread_done_event,
-                    ),
-                )
-                pin_memory_thread.daemon = True
-                pin_memory_thread.start()
-                # Similar to workers (see comment above), we only register
-                # pin_memory_thread once it is started.
-                self._pin_memory_thread = pin_memory_thread
-            else:
-                self._data_queue = self._worker_result_queue
-            self._worker_pids_set = False
-            # self._reset(loader, first_iter=True)
-            # yield
-
-    def get_data(self):
-        if self.download_in_progress:
-            return
-        self.download_in_progress = True
+        self._workers = []
         for i in range(self._num_workers):
             # No certainty which module multiprocessing_context is
-            index_queue = self.multiprocessing_context.Queue()  # type: ignore[var-annotated]
+            index_queue = multiprocessing_context.Queue()  # type: ignore[var-annotated]
             # Need to `cancel_join_thread` here!
             # See sections (2) and (3b) above.
-            index_queue.cancel_join_thread()
-            # this is slow!
             t = time.time() # used for logging
-            w = self.multiprocessing_context.Process(
+            index_queue.cancel_join_thread()
+            w = multiprocessing_context.Process(
                 target=torch.utils.data._utils.worker._worker_loop,
                 args=(
                     self._dataset_kind,
@@ -1119,13 +1070,151 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             w.start()
             self._index_queues.append(index_queue)
             self._workers.append(w)
-            # for _ in range(self.loader.batch_pool // (self.loader.batch_size // self.loader.num_workers)):
-            # for _ in range(self._prefetch_factor * self._num_workers):
-            # // Modified: start adding indexes to the fetch queue
-            self._try_prime_index(i)
-            yield w
-            # \\
-    # \\
+
+        if self._pin_memory:
+            self._pin_memory_thread_done_event = threading.Event()
+
+            # Queue is not type-annotated
+            self._data_queue = queue.Queue()  # type: ignore[var-annotated]
+            pin_memory_thread = threading.Thread(
+                target=_utils.pin_memory._pin_memory_loop,
+                args=(
+                    self._worker_result_queue,
+                    self._data_queue,
+                    torch.cuda.current_device(),
+                    self._pin_memory_thread_done_event,
+                ),
+            )
+            pin_memory_thread.daemon = True
+            pin_memory_thread.start()
+            # Similar to workers (see comment above), we only register
+            # pin_memory_thread once it is started.
+            self._pin_memory_thread = pin_memory_thread
+        else:
+            self._data_queue = self._worker_result_queue
+
+        # .pid can be None only before process is spawned (not the case, so ignore)
+        _utils.signal_handling._set_worker_pids(id(self), tuple(w.pid for w in self._workers))  # type: ignore[misc]
+        _utils.signal_handling._set_SIGCHLD_handler()
+        self._worker_pids_set = True
+        self._reset(loader, first_iter=True)
+
+    #     # // Modified: flag for checking whether the worker already started fetching data
+    #     self.download_in_progress = False
+    #     # \\
+
+    #     if loader.multiprocessing_context is None:
+    #         multiprocessing_context = multiprocessing
+    #     else:
+    #         multiprocessing_context = loader.multiprocessing_context
+
+    #     self._worker_init_fn = loader.worker_init_fn
+    #     self._worker_queue_idx_cycle = itertools.cycle(range(self._num_workers))
+    #     # No certainty which module multiprocessing_context is
+    #     self._worker_result_queue = multiprocessing_context.Queue()  # type: ignore[var-annotated]
+    #     self._worker_pids_set = False
+    #     self._shutdown = False
+    #     self._workers_done_event = multiprocessing_context.Event()
+
+    #     # // Modified: moved process creation outside the constructor
+    #     self.loader = loader
+    #     self.multiprocessing_context = multiprocessing_context
+
+    #     self._workers = []
+    #     self._index_queues = []
+    #     self._task_info = {}
+    #     self._send_idx = 0
+    #     self._rcvd_idx = 0
+    #     self._workers_status = [False for i in range(self._num_workers)]
+    #     self._tasks_outstanding = 0
+    #     # \\
+
+    # # // Modified: function that initializes process creation and starts data fetching
+    # def start_download(self):
+    #     self.start_data_download()
+
+    # def start_data_download(self):
+    #     for w in self.get_data():
+    #         if self._pin_memory:
+    #             self._pin_memory_thread_done_event = threading.Event()
+    #             # Queue is not type-annotated
+    #             self._data_queue = queue.Queue()  # type: ignore[var-annotated]
+    #             # self._data_queue = self.multiprocessing_context.Queue()  # type: ignore[var-annotated]
+    #             pin_memory_thread = threading.Thread(
+    #                 target=_utils.pin_memory._pin_memory_loop,
+    #                 args=(
+    #                     self._worker_result_queue,
+    #                     self._data_queue,
+    #                     torch.cuda.current_device(),
+    #                     self._pin_memory_thread_done_event,
+    #                 ),
+    #             )
+    #             pin_memory_thread.daemon = True
+    #             pin_memory_thread.start()
+    #             # Similar to workers (see comment above), we only register
+    #             # pin_memory_thread once it is started.
+    #             self._pin_memory_thread = pin_memory_thread
+    #         else:
+    #             self._data_queue = self._worker_result_queue
+    #         self._worker_pids_set = False
+    #         # self._reset(loader, first_iter=True)
+    #         # yield
+
+    # def get_data(self):
+    #     if self.download_in_progress:
+    #         return
+    #     self.download_in_progress = True
+    #     for i in range(self._num_workers):
+    #         # No certainty which module multiprocessing_context is
+    #         index_queue = self.multiprocessing_context.Queue()  # type: ignore[var-annotated]
+    #         # Need to `cancel_join_thread` here!
+    #         # See sections (2) and (3b) above.
+    #         index_queue.cancel_join_thread()
+    #         # this is slow!
+    #         t = time.time() # used for logging
+    #         w = self.multiprocessing_context.Process(
+    #             target=torch.utils.data._utils.worker._worker_loop,
+    #             args=(
+    #                 self._dataset_kind,
+    #                 self._dataset,
+    #                 index_queue,
+    #                 self._worker_result_queue,
+    #                 self._workers_done_event,
+    #                 self._auto_collation,
+    #                 self._collate_fn,
+    #                 self._drop_last,
+    #                 self._base_seed,
+    #                 self._worker_init_fn,
+    #                 i,
+    #                 self._num_workers,
+    #                 self._persistent_workers,
+    #                 # // Modified: additional parameters
+    #                 self.loader.fetch_impl,
+    #                 self.loader.num_fetch_workers,
+    #                 self.loader.batch_pool,
+    #                 t,
+    #                 # \\
+    #             ),
+    #         )
+    #         w.daemon = True
+    #         # NB: Process.start() actually take some time as it needs to
+    #         #     start a process and pass the arguments over via a pipe.
+    #         #     Therefore, we only add a worker to self._workers list after
+    #         #     it started, so that we do not call .join() if program dies
+    #         #     before it starts, and __del__ tries to join but will get:
+    #         #     AssertionError: can only join a started process.
+    #         s = time.time()
+    #         w.start()
+    #         print(f"Process start time: {time.time() - s}")
+    #         self._index_queues.append(index_queue)
+    #         self._workers.append(w)
+    #         # for _ in range(self.loader.batch_pool // (self.loader.batch_size // self.loader.num_workers)):
+    #         # for _ in range(self._prefetch_factor * self._num_workers):
+    #         # // Modified: start adding indexes to the fetch queue
+    #         self._try_prime_index(i)
+    #         yield w
+    #         # \\
+    # # \\
 
     def _reset(self, loader, first_iter=False):
         super()._reset(loader, first_iter)

@@ -282,6 +282,7 @@ def start_train(args, model, trainer):
 
 def run_cli():
     torch.multiprocessing.set_start_method("spawn")  # good solution !!!!
+    # torch.multiprocessing.set_start_method("fork")  # good solution !!!!
     parent_parser = ArgumentParser(add_help=False)
     parent_parser = pl.Trainer.add_argparse_args(parent_parser)
     parent_parser.add_argument("--data-path", metavar="DIR", type=str, help="path to dataset")
@@ -313,7 +314,7 @@ def run_cli():
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
     if torch.cuda.device_count() > 0:
-        parser.set_defaults(deterministic=True, max_epochs=20, gpus=[2])
+        parser.set_defaults(deterministic=True, max_epochs=10, gpus=[2])
     else:
         parser.set_defaults(deterministic=True, max_epochs=3)
     args = parser.parse_args()
