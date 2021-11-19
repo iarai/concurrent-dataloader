@@ -382,7 +382,7 @@ def _worker_loop(
                         # \\
                     else:
                         # // Modified: for enhanced logging
-                        timeline_batch_id = abs(hash(frozenset(index)) + time.time())
+                        timeline_batch_id = abs(hash(time.time()))
                         logging.getLogger("timeline").debug(
                             json.dumps({"item": "batch", "id": timeline_batch_id, "start_time": time.time()})
                         )

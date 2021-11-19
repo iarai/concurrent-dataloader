@@ -94,9 +94,11 @@
 #   done
 # done
 
-for fetch_impl in "threaded" "asyncio" "vanilla" ; do
+# for fetch_impl in "threaded" "asyncio" "vanilla" ; do
+for fetch_impl in "asyncio"; do
   for storage in "s3" "scratch"; do
     for implementation in "train/imagenet_torch.py" "train/imagenet_lightning.py" ; do
+    # for implementation in "train/imagenet_lightning.py" ; do
         python3 "${implementation}" --output_base_folder /iarai/home/ivan.svogor/git/storage-benchmarking/src/benchmark_output/1711-fork \
         --dataset "${storage}" \
         --num-fetch-workers 16 \
