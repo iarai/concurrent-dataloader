@@ -199,7 +199,7 @@ def main(args: Namespace) -> None:
             num_workers=args.workers,
             shuffle=False,
             prefetch_factor=args.prefetch_factor,
-            pin_memory=True,
+            # pin_memory=True,
         )
     else:
         train_data_loader = DataLoaderParallel(
