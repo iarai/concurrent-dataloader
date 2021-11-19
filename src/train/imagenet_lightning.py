@@ -281,8 +281,8 @@ def start_train(args, model, trainer):
 
 
 def run_cli():
-    torch.multiprocessing.set_start_method("spawn")  # good solution !!!!
-    # torch.multiprocessing.set_start_method("fork")  # good solution !!!!
+    # torch.multiprocessing.set_start_method("spawn")  # good solution !!!!
+    torch.multiprocessing.set_start_method("fork")  # good solution !!!!
     parent_parser = ArgumentParser(add_help=False)
     parent_parser = pl.Trainer.add_argparse_args(parent_parser)
     parent_parser.add_argument("--data-path", metavar="DIR", type=str, help="path to dataset")

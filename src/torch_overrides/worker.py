@@ -355,19 +355,19 @@ def _worker_loop(
                             json.dumps({"item": "batch", "id": idx + start_time, "start_time": time.time()})
                         )
                         # take remaining ones
-                        # for _ in range(batch_pool):
-                        #     # time.sleep(1e-4)
-                        #     if not index_queue.empty():
-                        #         current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
-                        #         batch_id, batch_indices = current_batch
-                        #         batch_sizes[batch_id] = len(batch_indices)
-                        #         logging.getLogger("timeline").debug(
-                        #             json.dumps(
-                        #                 {"item": "batch", "id": batch_id + start_time, "start_time": time.time()}
-                        #             )
-                        #         )
-                        #         for index in batch_indices:
-                        #             batches[index] = batch_id
+                        for _ in range(batch_pool):
+                            # time.sleep(1e-4)
+                            if not index_queue.empty():
+                                current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
+                                batch_id, batch_indices = current_batch
+                                batch_sizes[batch_id] = len(batch_indices)
+                                logging.getLogger("timeline").debug(
+                                    json.dumps(
+                                        {"item": "batch", "id": batch_id + start_time, "start_time": time.time()}
+                                    )
+                                )
+                                for index in batch_indices:
+                                    batches[index] = batch_id
 
                         # # logging.getLogger("stopwatch").debug(json.dumps(data))
                         for batch, batch_id in fetcher.yield_batch(items=batches, batch_sizes=batch_sizes):
