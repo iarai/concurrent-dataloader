@@ -1009,9 +1009,10 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
     #     down.
     def __init__(self, loader):
         super(_MultiProcessingDataLoaderIter, self).__init__(loader)
+
         assert self._num_workers > 0
         assert self._prefetch_factor > 0
-
+        self.loader = loader
         # // Modified: flag for checking whether the worker already started fetching data
         self.download_in_progress = False
         # \\
@@ -1116,7 +1117,9 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             #     it started, so that we do not call .join() if program dies
             #     before it starts, and __del__ tries to join but will get:
             #     AssertionError: can only join a started process.
+            s = time.time()
             w.start()
+            print(f"Process start time: {time.time() - s}")
             self._index_queues.append(index_queue)
             self._workers.append(w)
             # for _ in range(self.loader.batch_pool // (self.loader.batch_size // self.loader.num_workers)):
