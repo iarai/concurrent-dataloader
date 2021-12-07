@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 import torch.cuda
-from analysis.analyze_results import parse_results_log
+from benchmarking.analysis.analyze_results import parse_results_log
 from dataset.scratch_dataset import ScratchDataset
 
 

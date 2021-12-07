@@ -10,7 +10,7 @@ from dataset.s3_dataset import S3Dataset
 from dataset.scratch_dataset import ScratchDataset
 from dataset.t4c_s3_dataset import HDF5S3MODE
 from dataset.t4c_s3_dataset import T4CDataset
-from misc.logging_configuration import initialize_logging
+from benchmarking.misc.logging_configuration import initialize_logging
 
 
 def init_benchmarking(args: Namespace, action: str, loglevel: str = "INFO"):
@@ -65,7 +65,7 @@ def get_dataset(
             endpoint = "http://s3.amazonaws.com"
         dataset = S3Dataset(
             # TODO magic constants... extract to cli... how to do in a generic way...
-            **parse_args_file("s3_iarai_playground_imagenet.json", dataset_type),
+            **parse_args_file("../credentials_and_indexes/s3_iarai_playground_imagenet.json", dataset_type),
             index_file=Path(f"index-s3-{dataset_type}.json"),
             classes_file=Path(f"imagenet-{dataset_type}-classes.json"),
             limit=limit,

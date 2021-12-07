@@ -3,31 +3,22 @@ r""""Contains definitions of the methods used by the _BaseDataLoaderIter workers
 These **needs** to be in global scope since Py2 doesn't support serializing
 static methods.
 """
-# // Modified: added for logging
 import json
 import logging
-# \\
-
 import os
 import queue
-# // Modified: added for logging
 import random
 import time
-from typing import Union
-# \\
-
 from dataclasses import dataclass
+from typing import Union
 
-# // Modified: added for logging
 import torch.cuda
-from misc.time_helper import stopwatch
-# \\
-
 from torch._utils import ExceptionWrapper
 from torch.utils.data._utils import HAS_NUMPY
 from torch.utils.data._utils import IS_WINDOWS
 from torch.utils.data._utils import MP_STATUS_CHECK_INTERVAL
 from torch.utils.data._utils import signal_handling
+
 
 if IS_WINDOWS:
     import ctypes
@@ -153,7 +144,7 @@ class _ResumeIteration(object):
 # Copyright (c) 2019 NumPy Developers
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation image_paths (the "Software"), to deal
+# of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
@@ -226,9 +217,6 @@ def _generate_state(base_seed, worker_id):
     return state
 
 
-# // Modified: added for logging
-@stopwatch(trace_name="(3)-worker_loop", trace_level=3)
-# \\
 def _worker_loop(
     dataset_kind,
     dataset,
@@ -243,21 +231,18 @@ def _worker_loop(
     worker_id,
     num_workers,
     persistent_workers,
-    fetch_impl,
-    # // Modified: additional parameters for parallel fetching
-    num_fetch_workers,
-    batch_pool=10,  # number of batches to fetch simultaneously
-    start_time=None,
+    # // Modified: added parameter for initializing the log
     initializer=None,
     # \\
 ):
-    # // Modified: additional parameters for logging
+    # See NOTE [ Data Loader Multiprocessing Shutdown Logic ] for details on the
+    # logic of this function.
+
+    # // Modified: enhanced logging
     if initializer is not None:
         initializer()
     # \\
 
-    # See NOTE [ Data Loader Multiprocessing Shutdown Logic ] for details on the
-    # logic of this function.
     try:
         # Initialize C side signal handlers for SIGBUS and SIGSEGV. Python signal
         # module's handlers are executed after Python returns from C low-level
@@ -279,7 +264,7 @@ def _worker_loop(
         global _worker_info
         _worker_info = WorkerInfo(id=worker_id, num_workers=num_workers, seed=seed, dataset=dataset)
 
-        from torch_overrides.dataloader import _DatasetKind
+        from torch_overrides_vanilla.dataloader import _DatasetKind
 
         init_exception = None
 
@@ -287,12 +272,7 @@ def _worker_loop(
             if init_fn is not None:
                 init_fn(worker_id)
 
-            # // Modified: using our extended fetcher with additional parameters
-            #    fetch_impl, num_fetch_workers
-            fetcher = _DatasetKind.create_fetcher(
-                dataset_kind, dataset, auto_collation, collate_fn, drop_last, fetch_impl, num_fetch_workers
-            )
-            # \\
+            fetcher = _DatasetKind.create_fetcher(dataset_kind, dataset, auto_collation, collate_fn, drop_last)
         except Exception:
             init_exception = ExceptionWrapper(where="in DataLoader worker process {}".format(worker_id))
 
@@ -309,7 +289,9 @@ def _worker_loop(
         # `iteration_end` is set, we skip all processing step and just wait for
         # `None`.
         iteration_end = False
+
         watchdog = ManagerWatchdog()
+
         while watchdog.is_alive():
             try:
                 r = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
@@ -320,12 +302,7 @@ def _worker_loop(
                 data_queue.put((r, None))
                 iteration_end = False
                 # Recreate the fetcher for worker-reuse policy
-                # // Modified: using our extended fetcher with additional parameters
-                #    fetch_impl, num_fetch_workers
-                fetcher = _DatasetKind.create_fetcher(
-                    dataset_kind, dataset, auto_collation, collate_fn, drop_last, fetch_impl, num_fetch_workers
-                )
-                # \\
+                fetcher = _DatasetKind.create_fetcher(dataset_kind, dataset, auto_collation, collate_fn, drop_last)
                 continue
             elif r is None:
                 # Received the final signal
@@ -343,54 +320,16 @@ def _worker_loop(
                 init_exception = None
             else:
                 try:
-                    # // Modified: using threading to parallelize fetching
-                    if fetch_impl == "threaded":
-                        batch_sizes = {}  # store the size of each batch (not always the same, e.g. last batch)
-                        batches = {}  # batch data
-                        # take r (that was already read)
-                        batch_sizes[idx] = len(index)
-                        for i in index:
-                            batches[i] = idx
-                        logging.getLogger("timeline").debug(
-                            json.dumps({"item": "batch", "id": idx + start_time, "start_time": time.time()})
-                        )
-                        # take remaining ones
-                        for _ in range(batch_pool):
-                            # time.sleep(1e-4)
-                            if not index_queue.empty():
-                                current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
-                                batch_id, batch_indices = current_batch
-                                batch_sizes[batch_id] = len(batch_indices)
-                                logging.getLogger("timeline").debug(
-                                    json.dumps(
-                                        {"item": "batch", "id": batch_id + start_time, "start_time": time.time()}
-                                    )
-                                )
-                                for index in batch_indices:
-                                    batches[index] = batch_id
-
-                        # # logging.getLogger("stopwatch").debug(json.dumps(data))
-                        for batch, batch_id in fetcher.yield_batch(items=batches, batch_sizes=batch_sizes):
-                            time.sleep(0.0001)
-                            batch.sort(key=lambda index: index["item_id"])
-                            # print(f"Got batch {batch_id} ({len(batch)})")
-                            b = collate_fn([b["tensor"] for b in batch])
-                            logging.getLogger("timeline").debug(
-                                json.dumps({"item": "batch", "id": batch_id + start_time, "end_time": time.time()})
-                            )
-                            data_queue.put((batch_id, b))
-                        # \\
-                    else:
-                        # // Modified: for enhanced logging
-                        timeline_batch_id = abs(hash(time.time()))
-                        logging.getLogger("timeline").debug(
-                            json.dumps({"item": "batch", "id": timeline_batch_id, "start_time": time.time()})
-                        )
-                        data = fetcher.fetch(index)
-                        logging.getLogger("timeline").debug(
-                            json.dumps({"item": "batch", "id": timeline_batch_id, "end_time": time.time()})
-                        )
-                        # \\
+                    # // Modified: enhanced logging
+                    batch_timeline_id = abs(hash(time.time()))
+                    logging.getLogger("timeline").debug(
+                        json.dumps({"item": "batch", "id": batch_timeline_id, "start_time": time.time()})
+                    )
+                    data = fetcher.fetch(index)
+                    logging.getLogger("timeline").debug(
+                        json.dumps({"item": "batch", "id": batch_timeline_id, "end_time": time.time()})
+                    )
+                    # \\
                 except Exception as e:
                     if isinstance(e, StopIteration) and dataset_kind == _DatasetKind.Iterable:
                         data = _IterableDatasetStopIteration(worker_id)
@@ -403,12 +342,8 @@ def _worker_loop(
                         # `ExceptionWrapper` does the correct thing.
                         # See NOTE [ Python Traceback Reference Cycle Problem ]
                         data = ExceptionWrapper(where="in DataLoader worker process {}".format(worker_id))
-            # // Modified: once collected, return a batch and cleanup
-            if fetch_impl != "threaded":
-                data_queue.put((idx, data))
-                del data
-            # \\
-            del idx, index, r  # save memory
+            data_queue.put((idx, data))
+            del data, idx, index, r  # save memory
     except KeyboardInterrupt:
         # Main process will raise KeyboardInterrupt anyways.
         pass

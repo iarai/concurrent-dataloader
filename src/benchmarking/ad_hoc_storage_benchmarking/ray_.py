@@ -10,7 +10,6 @@ import ray
 from ray.util import ActorPool
 
 # setup client and session
-
 print("| implementation  | nodename | workers/actors |    payload |     elapsed | throughput|")
 print("|--------|---------|-----------|--------------|-------------|------------------|")
 

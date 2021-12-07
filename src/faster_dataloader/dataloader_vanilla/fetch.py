@@ -3,7 +3,7 @@ data from an iterable-style or map-style dataset. This logic is shared in both
 single- and multi-processing data loading.
 """
 # // Modified: added for logging
-from misc.time_helper import stopwatch
+from src.benchmarking.misc.time_helper import stopwatch
 # \\
 
 class _BaseDatasetFetcher(object):

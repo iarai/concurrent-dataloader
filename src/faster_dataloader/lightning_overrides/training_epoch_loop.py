@@ -22,7 +22,7 @@ from typing import Optional
 from typing import Union
 
 import torch
-from misc.time_helper import stopwatch
+from src.benchmarking.misc.time_helper import stopwatch
 from pytorch_lightning import loops  # import as loops to avoid circular imports
 from pytorch_lightning.loops.batch import TrainingBatchLoop
 from pytorch_lightning.trainer.connectors.logger_connector.result import ResultCollection

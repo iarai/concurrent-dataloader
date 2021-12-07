@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 from typing import List
 
-from misc.time_helper import stopwatch
+from src.benchmarking.misc.time_helper import stopwatch
 from torch import Tensor
 from torch.utils.data import Dataset
 # \\

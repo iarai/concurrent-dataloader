@@ -3,9 +3,9 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from dataset.indexed_dataset import IndexedDataset
-from misc.random_generator import RandomGenerator
-from misc.time_helper import stopwatch
+from src.faster_dataloader.dataset.indexed_dataset import IndexedDataset
+from src.benchmarking.misc.random_generator import RandomGenerator
+from src.benchmarking.misc.time_helper import stopwatch
 from overrides import overrides
 from PIL import Image
 from torchvision import transforms
