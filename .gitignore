@@ -150,3 +150,5 @@ src/benchmark_output/
 .idea
 src/lightning_logs/
 .tar
+.tar.gz
+src/benchmark_output.tar.gz
