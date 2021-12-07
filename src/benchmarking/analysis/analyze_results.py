@@ -330,7 +330,7 @@ def plot_events_timeline_detailed(
     colors = []
     lines = []
     texts = []
-    for index, t in enumerate(np.unique(thread_ids)):
+    for _, t in enumerate(np.unique(thread_ids)):
         last_i = 0
         for i, (_, param_series) in enumerate(dict_dataloader.items()):
             if param_series["threading_ident"] == t:

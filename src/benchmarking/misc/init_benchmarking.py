@@ -1,4 +1,5 @@
 import json
+import os
 import platform
 from argparse import Namespace
 from datetime import datetime
@@ -6,11 +7,11 @@ from pathlib import Path
 from typing import Any
 from typing import Optional
 
-from dataset.s3_dataset import S3Dataset
-from dataset.scratch_dataset import ScratchDataset
-from dataset.t4c_s3_dataset import HDF5S3MODE
-from dataset.t4c_s3_dataset import T4CDataset
-from benchmarking.misc.logging_configuration import initialize_logging
+from src.benchmarking.misc.logging_configuration import initialize_logging
+from src.faster_dataloader.dataset.s3_dataset import S3Dataset
+from src.faster_dataloader.dataset.scratch_dataset import ScratchDataset
+from src.faster_dataloader.dataset.t4c_s3_dataset import HDF5S3MODE
+from src.faster_dataloader.dataset.t4c_s3_dataset import T4CDataset
 
 
 def init_benchmarking(args: Namespace, action: str, loglevel: str = "INFO"):
@@ -48,6 +49,7 @@ def get_dataset(
     additional_args: Optional[Any] = None,
     limit: Optional[int] = None,
 ):
+    base_folder = os.path.dirname(__file__)
     if dataset == "t4c":
         # TODO magic constants... extract to cli... how to do in a generic way...
         dataset = T4CDataset(
@@ -65,17 +67,23 @@ def get_dataset(
             endpoint = "http://s3.amazonaws.com"
         dataset = S3Dataset(
             # TODO magic constants... extract to cli... how to do in a generic way...
-            **parse_args_file("../credentials_and_indexes/s3_iarai_playground_imagenet.json", dataset_type),
-            index_file=Path(f"index-s3-{dataset_type}.json"),
-            classes_file=Path(f"imagenet-{dataset_type}-classes.json"),
+            **parse_args_file(
+                os.path.join(base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json"), dataset_type
+            ),
+            index_file=Path(os.path.join(base_folder, f"../credentials_and_indexes/index-s3-{dataset_type}.json")),
+            classes_file=Path(
+                os.path.join(base_folder, f"../credentials_and_indexes/imagenet-{dataset_type}-classes.json")
+            ),
             limit=limit,
             endpoint_url=endpoint,
             use_cache=use_cache,
         )
     elif dataset == "scratch":
         dataset = ScratchDataset(
-            index_file=Path(f"index-scratch-{dataset_type}.json"),
-            classes_file=Path(f"imagenet-{dataset_type}-classes.json"),
+            index_file=Path(os.path.join(base_folder, f"../credentials_and_indexes/index-scratch-{dataset_type}.json")),
+            classes_file=Path(
+                os.path.join(base_folder, f"../credentials_and_indexes/imagenet-{dataset_type}-classes.json")
+            ),
             limit=limit,
         )
     print(f"Dataset loaded ... {dataset}, {dataset_type}, {len(dataset)}")

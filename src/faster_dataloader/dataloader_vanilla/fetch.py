@@ -4,7 +4,9 @@ single- and multi-processing data loading.
 """
 # // Modified: added for logging
 from src.benchmarking.misc.time_helper import stopwatch
+
 # \\
+
 
 class _BaseDatasetFetcher(object):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):

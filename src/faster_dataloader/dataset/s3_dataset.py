@@ -12,16 +12,16 @@ from typing import Tuple
 from typing import Union
 
 import tqdm
+from overrides import overrides
+from PIL import Image
+from torchvision import transforms
 
-from src.faster_dataloader.dataset.indexed_dataset import IndexedDataset
 from src.benchmarking.misc.random_generator import RandomGenerator
 from src.benchmarking.misc.s3_helpers import download_file_from_s3_url
 from src.benchmarking.misc.s3_helpers import get_s3_bucket
 from src.benchmarking.misc.s3_helpers import upload_file_to_s3_url
 from src.benchmarking.misc.time_helper import stopwatch
-from overrides import overrides
-from PIL import Image
-from torchvision import transforms
+from src.faster_dataloader.dataset.indexed_dataset import IndexedDataset
 
 
 # TODO  #32 extract index file operations to super class and use common format for scratch and s3?

@@ -217,7 +217,7 @@ def _generate_state(base_seed, worker_id):
     return state
 
 
-def _worker_loop(
+def _worker_loop(  # noqa
     dataset_kind,
     dataset,
     index_queue,

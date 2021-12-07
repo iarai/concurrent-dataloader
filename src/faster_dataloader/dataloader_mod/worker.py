@@ -6,28 +6,27 @@ static methods.
 # // Modified: added for logging
 import json
 import logging
-# \\
-
 import os
 import queue
-# // Modified: added for logging
 import random
 import time
-from typing import Union
-# \\
-
 from dataclasses import dataclass
+from typing import Union
 
-# // Modified: added for logging
 import torch.cuda
-from src.benchmarking.misc.time_helper import stopwatch
-# \\
-
 from torch._utils import ExceptionWrapper
 from torch.utils.data._utils import HAS_NUMPY
 from torch.utils.data._utils import IS_WINDOWS
 from torch.utils.data._utils import MP_STATUS_CHECK_INTERVAL
 from torch.utils.data._utils import signal_handling
+
+from src.benchmarking.misc.time_helper import stopwatch
+
+# \\
+# // Modified: added for logging
+# \\
+# // Modified: added for logging
+# \\
 
 if IS_WINDOWS:
     import ctypes
@@ -227,6 +226,7 @@ def _generate_state(base_seed, worker_id):
 
 
 # // Modified: added for logging
+# flake8: noqa: C901
 @stopwatch(trace_name="(3)-worker_loop", trace_level=3)
 # \\
 def _worker_loop(
@@ -356,7 +356,6 @@ def _worker_loop(
                         )
                         # take remaining ones
                         for _ in range(batch_pool):
-                            # time.sleep(1e-4)
                             if not index_queue.empty():
                                 current_batch = index_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
                                 batch_id, batch_indices = current_batch
@@ -368,12 +367,9 @@ def _worker_loop(
                                 )
                                 for index in batch_indices:
                                     batches[index] = batch_id
-
-                        # # logging.getLogger("stopwatch").debug(json.dumps(data))
                         for batch, batch_id in fetcher.yield_batch(items=batches, batch_sizes=batch_sizes):
                             time.sleep(0.0001)
                             batch.sort(key=lambda index: index["item_id"])
-                            # print(f"Got batch {batch_id} ({len(batch)})")
                             b = collate_fn([b["tensor"] for b in batch])
                             logging.getLogger("timeline").debug(
                                 json.dumps({"item": "batch", "id": batch_id + start_time, "end_time": time.time()})

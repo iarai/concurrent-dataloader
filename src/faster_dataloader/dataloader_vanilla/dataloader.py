@@ -25,8 +25,6 @@ import torch
 import torch.multiprocessing as multiprocessing
 from torch._six import string_classes
 from torch._utils import ExceptionWrapper
-
-# // Modified: imports that needed to be imported due to dataloader.py non standard location
 from torch.utils.data import _utils
 from torch.utils.data import BatchSampler
 from torch.utils.data import Dataset
@@ -34,16 +32,20 @@ from torch.utils.data import IterableDataset
 from torch.utils.data import RandomSampler
 from torch.utils.data import Sampler
 from torch.utils.data import SequentialSampler
+
 from src.faster_dataloader.dataloader_vanilla.fetch import _IterableDatasetFetcher
 from src.faster_dataloader.dataloader_vanilla.fetch import _MapDatasetFetcher
 from src.faster_dataloader.dataloader_vanilla.worker import get_worker_info
+
+# // Modified: imports that needed to be imported due to dataloader.py non standard location
 # \\
 
 T_co = TypeVar("T_co", covariant=True)
 T = TypeVar("T")
 _worker_init_fn_t = Callable[[int], None]
 
-# Ideally we would parameterize `DataLoader` by the return type of `collate_fn`, but there is currently no way to have that
+# Ideally we would parameterize `DataLoader` by the return type of `collate_fn`,
+# but there is currently no way to have that
 # type parameter set to a default value if the user doesn't pass in a custom 'collate_fn'.
 # See https://github.com/python/mypy/issues/3737.
 _collate_fn_t = Callable[[List[T]], Any]
@@ -179,6 +181,7 @@ class DataLoader(Generic[T_co]):
     _iterator: Optional["_BaseDataLoaderIter"]
     __initialized = False
 
+    # flake8: noqa: C901
     def __init__(
         self,
         dataset: Dataset[T_co],
@@ -364,7 +367,8 @@ class DataLoader(Generic[T_co]):
                                 "multiprocessing_context={!r}"
                             ).format(valid_start_methods, multiprocessing_context)
                         )
-                    # error: Argument 1 to "get_context" has incompatible type "Union[str, bytes]"; expected "str"  [arg-type]
+                    # error: Argument 1 to "get_context" has incompatible type "Union[str, bytes]";
+                    # expected "str"  [arg-type]
                     multiprocessing_context = multiprocessing.get_context(
                         multiprocessing_context
                     )  # type: ignore[arg-type]
@@ -439,10 +443,9 @@ class DataLoader(Generic[T_co]):
         else:
             return self.sampler
 
-    def __len__(self) -> int:  # noqa
+    def __len__(self) -> int:  #  noqa
         if self._dataset_kind == _DatasetKind.Iterable:
             # NOTE [ IterableDataset and __len__ ]
-            #
             # For `IterableDataset`, `__len__` could be inaccurate when one naively
             # does multi-processing data loading, since the samples will be duplicated.
             # However, no real use case should be actually using that behavior, so

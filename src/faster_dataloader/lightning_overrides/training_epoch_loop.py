@@ -22,7 +22,6 @@ from typing import Optional
 from typing import Union
 
 import torch
-from src.benchmarking.misc.time_helper import stopwatch
 from pytorch_lightning import loops  # import as loops to avoid circular imports
 from pytorch_lightning.loops.batch import TrainingBatchLoop
 from pytorch_lightning.trainer.connectors.logger_connector.result import ResultCollection
@@ -33,6 +32,8 @@ from pytorch_lightning.utilities.model_helpers import is_overridden
 from pytorch_lightning.utilities.signature_utils import is_param_in_hook_signature
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 from pytorch_lightning.utilities.warnings import WarningCache
+
+from src.benchmarking.misc.time_helper import stopwatch
 
 
 class TrainingEpochLoop(loops.Loop):
@@ -367,12 +368,13 @@ class TrainingEpochLoop(loops.Loop):
             return True
 
         if is_overridden("on_train_epoch_end", lightning_module):
-            model_hook_fx = getattr(lightning_module, "on_train_epoch_end")
+            model_hook_fx = getattr(lightning_module, "on_train_epoch_end")  # noqa
             if is_param_in_hook_signature(model_hook_fx, "outputs"):
                 return True
 
         return False
 
+    # flake8: noqa: C901
     @staticmethod
     def _prepare_outputs(
         outputs: List[List[List["ResultCollection"]]], batch_mode: bool

@@ -9,7 +9,6 @@ import itertools
 import json
 import logging
 import multiprocessing as python_multiprocessing
-# \\
 import os
 import threading
 import time
@@ -24,15 +23,10 @@ from typing import Sequence
 from typing import TypeVar
 
 import torch
-# // Modified:  multiprocessing
 import torch.multiprocessing as multiprocessing
-from torch.multiprocessing import queue  # works slightly better than the standard queue
-# \\
 from torch._six import string_classes
 from torch._utils import ExceptionWrapper
-
-
-# // Modified: imports that needed to be imported due to dataloader.py non standard location
+from torch.multiprocessing import queue  # works slightly better than the standard queue
 from torch.utils.data import _utils
 from torch.utils.data import BatchSampler
 from torch.utils.data import Dataset
@@ -40,11 +34,17 @@ from torch.utils.data import IterableDataset
 from torch.utils.data import RandomSampler
 from torch.utils.data import Sampler
 from torch.utils.data import SequentialSampler
+
 from src.faster_dataloader.dataloader_mod.fetch import _AsyncMapDatasetFetcher
 from src.faster_dataloader.dataloader_mod.fetch import _IterableDatasetFetcher
 from src.faster_dataloader.dataloader_mod.fetch import _MapDatasetFetcher
 from src.faster_dataloader.dataloader_mod.fetch import _ThreadedMapDatasetFetcher
 from src.faster_dataloader.dataloader_mod.worker import get_worker_info
+
+# \\
+# // Modified:  multiprocessing
+# \\
+# // Modified: imports that needed to be imported due to dataloader.py non standard location
 # \\
 
 T_co = TypeVar("T_co", covariant=True)
@@ -92,7 +92,9 @@ class _DatasetKind(object):
                 raise ValueError("Provided fetcher implementation doesn't exist.")
         else:
             return _IterableDatasetFetcher(dataset, auto_collation, collate_fn, drop_last)
+
     # \\
+
 
 class _InfiniteConstantSampler(Sampler):
     r"""Analogous to ``itertools.repeat(None, None)``.
@@ -615,10 +617,9 @@ class _BaseDataLoaderIter(object):
 
     # // Modified: added function
     def start_download(self):
-        """
-        Used to offload process initialization from the __init__
-        """
+        """Used to offload process initialization from the __init__"""
         raise NotImplementedError
+
     # \\
 
     def __next__(self) -> Any:
@@ -1085,7 +1086,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             # See sections (2) and (3b) above.
             index_queue.cancel_join_thread()
             # this is slow!
-            t = time.time() # used for logging
+            t = time.time()  # used for logging
             w = self.multiprocessing_context.Process(
                 target=torch.utils.data._utils.worker._worker_loop,
                 args=(
@@ -1126,6 +1127,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             self._try_prime_index(i)
             yield w
             # \\
+
     # \\
 
     def _reset(self, loader, first_iter=False):
@@ -1159,6 +1161,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         for _ in range(self._prefetch_factor * self._num_workers):
             self._try_put_index()
 
+    # flake8: noqa: C901
     def _try_get_data(self, timeout=_utils.MP_STATUS_CHECK_INTERVAL):
         # Tries to fetch data from `self._data_queue` once for a given timeout.
         # This can also be used as inner loop of fetching without timeout, with
@@ -1392,10 +1395,11 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
 
     # // Modified: added function
     def _try_prime_index(self, id: int) -> None:
-        """
-        Starts putting indexes to the worker fetch queue. Otherwise, one needs to wait until all the worker
-        processes are created. However, sometimes `w.start` can take a while, and therefore we want to start
-        fetching data as soon as possible, i.e. when at least one worker has been started.
+        """Starts putting indexes to the worker fetch queue. Otherwise, one
+        needs to wait until all the worker processes are created. However,
+        sometimes `w.start` can take a while, and therefore we want to start
+        fetching data as soon as possible, i.e. when at least one worker has
+        been started.
 
         Parameters
         ----------
@@ -1411,6 +1415,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         self._task_info[self._send_idx] = (worker_queue_idx,)
         self._tasks_outstanding += 1
         self._send_idx += 1
+
     # \\
 
     def _try_put_index(self):

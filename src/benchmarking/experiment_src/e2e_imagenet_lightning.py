@@ -30,20 +30,21 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
-from lightning_overrides import training_epoch_loop
-from main import get_dataset
-from main import init_benchmarking
-from misc.gpulogger import GPUSidecarLogger
-from misc.logging_configuration import initialize_logging
-from misc.time_helper import stopwatch
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import GPUStatsMonitor
 from pytorch_lightning.core import LightningModule
 from pytorch_lightning.profiler import SimpleProfiler
-from torch_overrides.dataloader import DataLoader as DataLoaderParallel
-from torch_overrides.worker import _worker_loop as _worker_loop_parallel
-from torch_overrides_vanilla.dataloader import DataLoader as DataLoaderVanilla
-from torch_overrides_vanilla.worker import _worker_loop as _worker_loop_vanilla
+
+from src.benchmarking.misc.gpulogger import GPUSidecarLogger
+from src.benchmarking.misc.init_benchmarking import get_dataset
+from src.benchmarking.misc.init_benchmarking import init_benchmarking
+from src.benchmarking.misc.logging_configuration import initialize_logging
+from src.benchmarking.misc.time_helper import stopwatch
+from src.faster_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
+from src.faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
+from src.faster_dataloader.dataloader_vanilla.dataloader import DataLoader as DataLoaderVanilla
+from src.faster_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
+from src.faster_dataloader.lightning_overrides import training_epoch_loop
 
 
 class ImageNetLightningModel(LightningModule):
@@ -95,16 +96,6 @@ class ImageNetLightningModel(LightningModule):
         self.log("train_acc1", acc1, on_step=True, prog_bar=True, on_epoch=True, logger=True)
         self.log("train_acc5", acc5, on_step=True, on_epoch=True, logger=True)
         return loss_train
-
-    # @stopwatch(trace_name="(7)-validation_step", trace_level=7)
-    # def validation_step(self, batch, batch_idx):
-    #     images, target = batch
-    #     output = self(images)
-    #     loss_val = F.cross_entropy(output, target)
-    #     acc1, acc5 = self.__accuracy(output, target, topk=(1, 5))
-    #     self.log("val_loss", loss_val, on_step=True, on_epoch=True)
-    #     self.log("val_acc1", acc1, on_step=True, prog_bar=True, on_epoch=True)
-    #     self.log("val_acc5", acc5, on_step=True, on_epoch=True)
 
     @staticmethod
     def __accuracy(output, target, topk=(1,)):
@@ -199,7 +190,7 @@ def main(args: Namespace) -> None:
             num_workers=args.workers,
             shuffle=False,
             prefetch_factor=args.prefetch_factor,
-            # pin_memory=True,
+            pin_memory=args.pin_memory,
         )
     else:
         train_data_loader = DataLoaderParallel(
@@ -281,8 +272,7 @@ def start_train(args, model, trainer):
 
 
 def run_cli():
-    # torch.multiprocessing.set_start_method("spawn")  # good solution !!!!
-    torch.multiprocessing.set_start_method("fork")  # good solution !!!!
+    torch.multiprocessing.set_start_method("fork")  # Important
     parent_parser = ArgumentParser(add_help=False)
     parent_parser = pl.Trainer.add_argparse_args(parent_parser)
     parent_parser.add_argument("--data-path", metavar="DIR", type=str, help="path to dataset")
@@ -310,7 +300,6 @@ def run_cli():
     pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.advance = (
         training_epoch_loop.TrainingEpochLoop.advance
     )
-
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
     if torch.cuda.device_count() > 0:

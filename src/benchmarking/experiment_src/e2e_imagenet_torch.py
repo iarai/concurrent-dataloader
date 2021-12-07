@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import random
-import shutil
 import time
 import warnings
 from functools import partial
@@ -18,24 +17,21 @@ import torch.optim
 import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
-from main import get_dataset
-from main import init_benchmarking
-from misc.gpulogger import GPUSidecarLogger
-from misc.logging_configuration import initialize_logging
-from torch_overrides.dataloader import DataLoader as DataLoaderParallel
-from torch_overrides.worker import _worker_loop as _worker_loop_parallel
-from torch_overrides_vanilla.dataloader import DataLoader as DataLoaderVanilla
-from torch_overrides_vanilla.worker import _worker_loop as _worker_loop_vanilla
 
-#
+from src.benchmarking.misc.gpulogger import GPUSidecarLogger
+from src.benchmarking.misc.init_benchmarking import get_dataset
+from src.benchmarking.misc.init_benchmarking import init_benchmarking
+from src.benchmarking.misc.logging_configuration import initialize_logging
+from src.faster_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
+from src.faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
+from src.faster_dataloader.dataloader_vanilla.dataloader import DataLoader as DataLoaderVanilla
+from src.faster_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
 
 model_names = sorted(
     name for name in models.__dict__ if name.islower() and not name.startswith("__") and callable(models.__dict__[name])
 )
 
 parser = argparse.ArgumentParser(description="PyTorch ImageNet Training")
-
-# parser.add_argument('data', metavar='DIR', help='path to dataset')
 
 parser.add_argument(
     "-a",
@@ -135,7 +131,7 @@ def main():
         main_worker(args.gpu, ngpus_per_node, args)
 
 
-def main_worker(gpu, ngpus_per_node, args):
+def main_worker(gpu, ngpus_per_node, args):  # noqa
     global best_acc1
     args.gpu = gpu
 
@@ -222,14 +218,14 @@ def main_worker(gpu, ngpus_per_node, args):
 
     cudnn.benchmark = True
 
+    # create datasets
+    val_dataset = get_dataset(args.dataset, dataset_type="val", limit=args.dataset_limit, use_cache=args.use_cache)
+    train_dataset = get_dataset(args.dataset, dataset_type="train", limit=args.dataset_limit, use_cache=args.use_cache)
+
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     else:
         train_sampler = None
-
-        # create datasets
-    val_dataset = get_dataset(args.dataset, dataset_type="val", limit=args.dataset_limit, use_cache=args.use_cache)
-    train_dataset = get_dataset(args.dataset, dataset_type="train", limit=args.dataset_limit, use_cache=args.use_cache)
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     transform = transforms.Compose(
@@ -294,22 +290,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # train for one epoch
         train(train_loader, model, criterion, optimizer, epoch, args)
-
-        is_best = False
-
-        if not args.multiprocessing_distributed or (
-            args.multiprocessing_distributed and args.rank % ngpus_per_node == 0
-        ):
-            save_checkpoint(
-                {
-                    "epoch": epoch + 1,
-                    "arch": args.arch,
-                    "state_dict": model.state_dict(),
-                    "best_acc1": best_acc1,
-                    "optimizer": optimizer.state_dict(),
-                },
-                is_best,
-            )
 
     if torch.cuda.device_count() > 0 and gpu_logger is not None:
         gpu_logger.stop()
@@ -376,12 +356,6 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             progress.display(i)
 
 
-def save_checkpoint(state, is_best, filename="checkpoint.pth.tar"):
-    torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, "model_best.pth.tar")
-
-
 class AverageMeter(object):
     """Computes and stores the average and current value."""
 
@@ -401,7 +375,7 @@ class AverageMeter(object):
         self.sum += val * n
 
         self.count += n
-        self.avg = self.sum / self.count
+        self.avg = self.sum / self.count  # noqa
 
     def __str__(self):
         fmtstr = "{name} {val" + self.fmt + "} ({avg" + self.fmt + "})"

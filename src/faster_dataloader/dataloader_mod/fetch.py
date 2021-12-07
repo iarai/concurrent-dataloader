@@ -2,7 +2,6 @@ r""""Contains definitions of the methods used by the _BaseDataLoaderIter to fetc
 data from an iterable-style or map-style dataset. This logic is shared in both
 single- and multi-processing data loading.
 """
-
 # // Modified: added libraries for parallel downloads
 import asyncio
 import concurrent
@@ -11,10 +10,13 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 from typing import List
 
-from src.benchmarking.misc.time_helper import stopwatch
 from torch import Tensor
 from torch.utils.data import Dataset
+
+from src.benchmarking.misc.time_helper import stopwatch
+
 # \\
+
 
 class _BaseDatasetFetcher(object):
     def __init__(self, dataset, auto_collation, collate_fn, drop_last):
@@ -61,6 +63,7 @@ class _MapDatasetFetcher(_BaseDatasetFetcher):
             data = self.dataset[possibly_batched_index]
         return self.collate_fn(data)
 
+
 # // Modified: added two new classes to parallelize data fetching -- using Asyncio
 class _AsyncMapDatasetFetcher(_BaseDatasetFetcher):
     def __init__(
@@ -79,8 +82,6 @@ class _AsyncMapDatasetFetcher(_BaseDatasetFetcher):
             index = await task_queue.get()
             try:
                 result = await self.loop.run_in_executor(self._executor, self.dataset.__getitem__, index)
-                # if self.collate_fn is not None:
-                #     result = self.collate_fn(result)
                 result_queue.put_nowait((index, result))
             except Exception as e:
                 print(f"Exception in fetch worker {worker_id}: {str(e)}")
@@ -140,6 +141,8 @@ class _AsyncMapDatasetFetcher(_BaseDatasetFetcher):
         # create a future that waits for all tasks to complete
         result = self.loop.run_until_complete(self.initiate_fetch_tasks(batch_indices))
         return result
+
+
 # \\
 
 # // Modified: added two new classes to parallelize data fetching -- using multiple threads
@@ -206,4 +209,6 @@ class _ThreadedMapDatasetFetcher(_BaseDatasetFetcher):
                 if len(collected_batches[b]) == batch_sizes[b]:
                     yield collected_batches[b], b
                     del collected_batches[b]
+
+
 # \\
