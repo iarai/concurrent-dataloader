@@ -6,8 +6,9 @@ from pathlib import Path
 
 import pytest
 import torch.cuda
-from benchmarking.analysis.analyze_results import parse_results_log
-from dataset.scratch_dataset import ScratchDataset
+from src.faster_dataloader.dataset.scratch_dataset import ScratchDataset
+
+from src.benchmarking.analysis.analyze_results import parse_results_log
 
 
 # TODO add s3 etc. if available
@@ -16,7 +17,7 @@ from dataset.scratch_dataset import ScratchDataset
     "dataset", [("scratch")],
 )
 def test_benchmark_scratch_dataset(dataset: str):
-    from benchmark.benchmark_dataset import main
+    from src.benchmarking.experiment_src.benchmark_dataset import main
 
     with tempfile.TemporaryDirectory() as temp_dir:
         index_file = os.path.join(temp_dir, "index_scratch.json")

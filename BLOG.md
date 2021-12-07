@@ -20,7 +20,7 @@ We will look at the following pipeline:
 
 This execution order is illustrated in the following figure:
 
-![Exec path](doc/exec-path.png)
+![Exec path](docs/exec-path.png)
 
 ### Benchmarking the Pipeline
 
@@ -82,7 +82,7 @@ The bar chart shows bottom-up mean, median, min and max execution time for a giv
 finally the total time for `benchmark_dataloader`. Furthermore, the experiments are performed with `async` and `sync` `DataLoader` (explained above), and the
 results are grouped, using the same batch size, but different number of workers, 2, 4, 8, 16, 32, respectfully.
 
-![Exec path](doc/storage-scratch.png)
+![Exec path](docs/storage-scratch.png)
 
 ### S3 (lnx-slim-2)
 
@@ -108,11 +108,11 @@ The bar chart shows bottom-up mean, median, min and max execution time for a giv
 finally the total time for `benchmark_dataloader`. Furthermore, the experiments are performed with `async` and `sync` `DataLoader` (explained above), and the
 results are grouped, using the same batch size, but different a number of workers, 2, 4, 8, 16, 32, respectfully.
 
-![Exec path](doc/storage-s3.png)
+![Exec path](docs/storage-s3.png)
 
 ### S3 (tu-fat-3)
 
-![Exec path](doc/storage-s3-tu-fat3.png)
+![Exec path](docs/storage-s3-tu-fat3.png)
 
 ## Improvements Storage to Staging
 

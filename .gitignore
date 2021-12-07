@@ -4,7 +4,7 @@ __pycache__/
 *$py.class
 
 #s3 cred
-src/s3_iarai_playground_imagenet.json
+src/benchmarking/credentials_and_indexes/s3_iarai_playground_imagenet.json
 output/
 
 # C extensions
@@ -146,9 +146,9 @@ cython_debug/
 
 output
 output_s3
-src/benchmark_output/
+src/faster_dataloader/benchmark_output/
 .idea
-src/lightning_logs/
+src/faster_dataloader/lightning_logs/
 .tar
 .tar.gz
-src/benchmark_output.tar.gz
+src/faster_dataloader/benchmark_output.tar.gz
