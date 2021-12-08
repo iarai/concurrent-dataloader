@@ -7,6 +7,11 @@ from json import JSONDecodeError
 from pathlib import Path
 from typing import Dict
 from typing import List
+from pathlib import Path
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib
+from collections import defaultdict
 
 import humanize
 import matplotlib
@@ -429,6 +434,37 @@ def extract_gpu_utilization(output_base_folder: Path, folder_filter: str = "**",
     return data
 
 
+def extract_gpuutil(output_base_folder: Path, folder_filter: str = "**", filter_by_metadata: Dict[str, List[str]] = None,
+):
+    files = list(output_base_folder.rglob(f"{folder_filter}/gpuutil-*.log"))
+    data = []
+    for working_file_path in tqdm.tqdm(files, total=len(files)):
+        results = parse_results_log(working_file_path)
+        if len(results) == 0:
+            continue
+        header = []
+        header.append("timestamp")
+        for i in results[0]["gpu_data"]:
+            header.append(f"gpu_util_{i}")
+            header.append(f"mem_util_{i}")
+        header.append("run")
+        lines = []
+        for result in results:
+            line = []
+            line.append(result["timestamp"])
+            for item in result["gpu_data"]:
+                line.append(result["gpu_data"][item]["gpu_util"])
+                line.append(result["gpu_data"][item]["mem_util"])
+            line.append(working_file_path.parent.name)
+            lines.append(line)
+        results = pd.DataFrame.from_records(lines)
+        data.append(results)
+    df = pd.concat(data)
+    df.columns = header
+    df.groupby
+    df.sort_values(["timestamp"], ascending=True)
+    return df
+
 def extract_profiling(output_base_folder: Path, folder_filter: str = "**", device_id=0):
     folders = list(output_base_folder.rglob(f"{folder_filter}"))
     files = output_base_folder.rglob(f"{folder_filter}/lightning/*.txt")
@@ -443,3 +479,247 @@ def extract_profiling(output_base_folder: Path, folder_filter: str = "**", devic
             data = data.append(pd.read_csv(io.StringIO(text), sep="|", header=None, names=column_names))
     data.drop("NaN", axis=1, inplace=True)
     return data
+
+def extract_timelines(output_base_folder: Path, folder_filter: str = "**", filter_by_metadata: Dict[str, List[str]] = None,
+):
+    files = list(output_base_folder.rglob(f"{folder_filter}/timeline-*.log"))
+    data = []
+    for working_file_path in tqdm.tqdm(files, total=len(files)):
+        results = parse_results_log(working_file_path)
+        if len(results) == 0:
+            continue
+        results = pd.DataFrame.from_records(data=results)
+        results = pd.merge(results[results["end_time"].isnull()], 
+                           results[results["start_time"].isnull()], 
+                           left_on='id', 
+                           right_on='id').drop(['end_time_x', 'start_time_y'], axis=1)
+        results["source_file"] = working_file_path
+        results["run"] = working_file_path.parent.name
+        # filter out old data format missing dataset etc.
+        data.append(results)
+    df = pd.concat(data)
+    df.groupby
+    return df
+
+def show_timelines(df, run, colors, flat=False, zoom=False, zoom_epochs = 1):
+    fig, ax = plt.subplots(figsize=(30, 20))
+    data = defaultdict(list)
+    start = min(df["start_time_x"]) 
+    end = max(df["end_time_y"])
+    
+    total_runtime = (end - start)
+    number_of_epochs = 20
+    
+    if zoom:
+        df = df[df["start_time_x"] < start+((total_runtime / number_of_epochs) * zoom_epochs)]
+    
+    i = 0
+    for index, row in df.sort_values(["start_time_x"], ascending=True).iterrows():
+        duration = row["end_time_y"] - row["start_time_x"] 
+        x1 = row["start_time_x"] - start 
+        if duration < 0.08:
+            duration = 0.1
+        x2 = x1 + duration
+        if not flat:
+            lane = i
+            i += 1
+        else:
+            lane = lanes[row["item_x"]]
+        ax.plot([x1, x2], [lane, lane], color=colors[row["item_x"]], label=row["item_x"], linewidth=1)
+    ax.set_xlabel("Experiment duration", loc="center")
+    ax.set_ylabel("Item", loc="top")
+    # print(run.split('_'))
+    # ['20211109f152412', 'benchmark', 'e2e', 'lightning', 's3', '256', '4', '16', '1', 'vanilla', 'sync']
+    filename = run.split('_')
+    ax.set_title(f"Runtime for each function, impl: {filename[9]},"
+                 f" cache: {filename[8]}, "
+                 f" batch size: {filename[5]}, "
+                 f" lib: {filename[3]}",
+                 loc='center')
+    ax.legend()
+    ax.grid(linestyle='--', which="both")
+
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+
+    # Put a legend below current axis
+    ax.legend(by_label.values(), by_label.keys(), 
+              loc='upper center', bbox_to_anchor=(0.5, -0.05),
+              fancybox=True, shadow=True, ncol=5)
+    plt.show()
+
+def show_timelines_with_gpu(df, gpu_util, colors, run, flat=False, show_gpu=False, zoom=False, zoom_epochs = 1):
+    fig, ax = plt.subplots(figsize=(30, 25))
+    # fig, ax = plt.subplots()
+    plt.rcParams.update({'font.size': 18})
+    data = defaultdict(list)
+    start = min(df["start_time_x"]) 
+    end = max(df["end_time_y"]) 
+    gpu_start = min(gpu_util["timestamp"])
+    gpu_end = max(gpu_util["timestamp"])
+    
+    total_runtime = (end - start)
+    number_of_epochs = 20
+    
+    if zoom:
+        df = df[df["start_time_x"] < start+((total_runtime / number_of_epochs) * zoom_epochs)]
+        gpu_util = gpu_util[gpu_util["timestamp"] < gpu_start+((total_runtime / number_of_epochs) * zoom_epochs)]
+    
+    lane = 0
+    for index, row in df.sort_values(["start_time_x"], ascending=True).iterrows():
+        duration = row["end_time_y"] - row["start_time_x"] 
+        x1 = row["start_time_x"] - start 
+        if duration < 0.15:
+            duration = 0.2
+        x2 = x1 + duration
+        if not flat:
+            lane += 10
+        else:
+            lane = lanes[row["item_x"]]
+        ax.plot([x1, x2], [lane, lane], color=colors[row["item_x"]], label=row["item_x"], linewidth=3)
+    
+
+    ax.set_xlabel("Experiment duration (S)", loc="right")
+    ax.set_ylabel("Operation activity lane", loc="center")
+    filename = run.split('_')
+
+    
+    ax.legend()
+    ax.grid(linestyle='--', which="both")
+
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+
+    # Put a legend below current axis
+    ax.legend(by_label.values(), by_label.keys(), 
+              loc='upper center', bbox_to_anchor=(0.5, -0.05),
+              fancybox=True, shadow=True, ncol=5)
+    
+    gpu_util_mean = 0
+    gpu_util_mean_no_zeros = 0
+    
+    if show_gpu:
+        ax2 = ax.twinx() 
+        ax2.set_ylabel('GPU/Memory utilization (green, maroon)')
+        
+        r'{\fontsize{50pt}{3em}\selectfont{}a}{\fontsize{20pt}{3em}\selectfont{}N'
+        ax2.set_ylim([-3, 103])
+        gpu_events = []
+        for i in gpu_util["timestamp"]:
+            gpu_events.append(i - start)
+        ax2.plot(gpu_events, gpu_util["gpu_util_2"], color="cyan", linestyle="--", linewidth=2)
+        ax2.plot(gpu_events, gpu_util["mem_util_2"], color="maroon", linestyle="--", linewidth=2)
+        gpu_util_zeros = (len(gpu_util[gpu_util['gpu_util_2'] == 0]['gpu_util_2']) / len(gpu_util['gpu_util_2'])) * 100        
+        gpu_util_mean_no_zeros = np.mean(gpu_util[gpu_util['gpu_util_2'] > 0]['gpu_util_2']) 
+        mem_util_mean = np.mean(gpu_util['mem_util_2'])
+        mem_util_mean_no_zeros = np.mean(gpu_util[gpu_util['mem_util_2'] > 0]['mem_util_2']) 
+        ax2.plot(gpu_events, [gpu_util_mean_no_zeros]*len(gpu_events), label='GPU Util Mean', linewidth=2, color='cyan')
+        ax2.plot(gpu_events, [mem_util_mean_no_zeros]*len(gpu_events), label='Mem Util Mean', linewidth=2, color='maroon')
+        print(gpu_util_mean_no_zeros, mem_util_mean_no_zeros)
+        
+        
+    ax.set_title(f"Total runtime per operation \n Implementation: {filename[9]},"
+             f" use cache: {filename[8]}, "
+             f" batch size: {filename[5]}, "
+             f" library: {filename[3]}, "
+             f"\n GPU unused: {round(gpu_util_zeros, 2)} %, "
+             f" mean GPU usage: {round(gpu_util_mean_no_zeros, 2)} %",
+             loc='center')
+
+    plt.show()
+    return {"runtime": end-start, 
+            "gpu_util_zero": gpu_util_zeros, 
+            "gpu_util_mean_no_zeros": gpu_util_mean_no_zeros, 
+            "mem_util_mean": mem_util_mean, 
+            "mem_util_mean_no_zeros": mem_util_mean_no_zeros, 
+            "implementation": filename[9],
+            "cache": filename[8],
+            "library": filename[3]
+           }
+
+def get_gpu_stats(df, gpu_util, run, flat=False, show_gpu=False, zoom=False, zoom_epochs = 1):
+    data = defaultdict(list)
+    start = min(df["start_time_x"]) 
+    end = max(df["end_time_y"]) 
+    gpu_start = min(gpu_util["timestamp"])
+    gpu_end = max(gpu_util["timestamp"])
+    
+    total_runtime = (end - start)
+    filename = run.split('_')
+    gpu_util_mean = 0
+    gpu_util_mean_no_zeros = 0
+    
+    gpu_events = []
+    for i in gpu_util["timestamp"]:
+        gpu_events.append(i - start)
+    gpu_util_zeros = (len(gpu_util[gpu_util['gpu_util_2'] == 0]['gpu_util_2']) / len(gpu_util['gpu_util_2'])) * 100        
+    gpu_util_mean_no_zeros = np.mean(gpu_util[gpu_util['gpu_util_2'] > 0]['gpu_util_2']) 
+    mem_util_mean = np.mean(gpu_util['mem_util_2'])
+    mem_util_mean_no_zeros = np.mean(gpu_util[gpu_util['mem_util_2'] > 0]['mem_util_2']) 
+#     print(gpu_util_mean_no_zeros, mem_util_mean_no_zeros)
+
+    return {"runtime": end-start, 
+            "gpu_util_zero": gpu_util_zeros, 
+            "gpu_util_mean_no_zeros": gpu_util_mean_no_zeros, 
+            "mem_util_mean": mem_util_mean, 
+            "mem_util_mean_no_zeros": mem_util_mean_no_zeros, 
+            "implementation": filename[9],
+            "cache": filename[8],
+            "library": filename[3]
+           }
+
+def plot_histogram(throughput, title):
+    fig, ax = plt.subplots(figsize=(10, 5))
+    plt.rcParams.update({'font.size': 12})
+    ax.hist(throughput, bins=3)
+    mean = np.mean(throughput).round(2)
+    std = np.std(throughput).round(2)
+    ax.axvline(np.mean(throughput), linestyle='dashed', linewidth=2, color="green")
+    ax.set_title(title + f": mean = {mean},"
+                 f" var: {np.var(throughput).round(2)},"
+                 f" std:{std}")
+    ax.set_xlabel("Throughput (imgs/S)", loc="right")
+    ax.set_ylabel("Experiments", loc="center")
+    ax.set_xlim(mean - 3*std, mean + 3*std)
+    ax.plot()
+    
+def plot_all_histograms(res, impls, libs, display = True):
+    df_throughput_all = pd.DataFrame()
+    for impl in impls:
+        for lib in libs:
+            throughput = []
+            key = f"{impl}_{lib}"
+            for experiment in range(len(res)):
+                data = res[experiment].round(2)
+                data = data[(data["library"]==lib) & (data["implementation"]==impl)]["throughput"]
+                throughput.append(data)
+            df_throughput_all[key] = pd.DataFrame.from_records(throughput)
+            if display:
+                plot_histogram(throughput, f"Setup: {impl}, {lib}")
+    return df_throughput_all
+
+def plot_violins(throughput, title):
+    fig, ax = plt.subplots(figsize=(10, 10))
+    plt.rcParams.update({'font.size': 12})
+    all_data = []
+    labels = []
+    for i in range(len(throughput)):
+        data = throughput.iloc[i]
+        index = data.name
+        data = data.values.tolist()
+        all_data.append(data[:-3])
+        labels.append(index)
+    # print(labels)
+    ax.violinplot(all_data, vert=True, widths=0.5, showmeans=True)
+
+    ax.xaxis.set_tick_params(direction='out')
+    ax.xaxis.set_ticks_position('bottom')
+    ax.set_xticks(np.arange(1, len(labels) + 1))
+    ax.set_xticklabels(labels=labels, rotation=20)
+    ax.set_xlim(0.25, len(labels) + 0.75)
+    ax.set_xlabel('Experiment setup')
+    ax.set_ylabel('Throughput (imgs/s)')
+    ax.set_title(title)
+    # ax.set_xticks(range(len(labels)), labels=labels)
+    ax.grid(linestyle='--', which="both")
+    plt.plot()
