@@ -5,7 +5,6 @@ import os
 import random
 import time
 import warnings
-from functools import partial
 from pathlib import Path
 
 import torch.backends.cudnn as cudnn
@@ -17,7 +16,6 @@ import torch.optim
 import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
-
 from benchmarking.misc.init_benchmarking import get_dataset
 from faster_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
 from faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
@@ -215,28 +213,34 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
 
     # get the credentials and indexes
     base_folder = os.path.dirname(__file__)
-    s3_credential_file = os.path.join(base_folder, "../src/benchmarking/credentials_and_indexes/s3_iarai_playground_imagenet.json")
-    
-    # create datasets
-    val_dataset = get_dataset(args.dataset, 
-                                dataset_type="val", 
-                                limit=args.dataset_limit, 
-                                use_cache=args.use_cache, 
-                                index_file=Path(os.path.join(base_folder, 
-                                                f"../src/benchmarking/credentials_and_indexes/index-s3-val.json")),
-                                classes_file=Path(os.path.join(base_folder, 
-                                                f"../src/benchmarking/credentials_and_indexes/imagenet-val-classes.json")),
-                                s3_credential_file=s3_credential_file)
+    s3_credential_file = os.path.join(
+        base_folder, "../src/benchmarking/credentials_and_indexes/s3_iarai_playground_imagenet.json"
+    )
 
-    train_dataset = get_dataset(args.dataset, 
-                                dataset_type="train", 
-                                limit=args.dataset_limit, 
-                                use_cache=args.use_cache, 
-                                index_file=Path(os.path.join(base_folder, 
-                                                f"../src/benchmarking/credentials_and_indexes/index-s3-train.json")),
-                                classes_file=Path(os.path.join(base_folder, 
-                                                f"../src/benchmarking/credentials_and_indexes/imagenet-train-classes.json")),
-                                s3_credential_file=s3_credential_file)
+    # create datasets
+    val_dataset = get_dataset(
+        args.dataset,
+        dataset_type="val",
+        limit=args.dataset_limit,
+        use_cache=args.use_cache,
+        index_file=Path(os.path.join(base_folder, "../src/benchmarking/credentials_and_indexes/index-s3-val.json")),
+        classes_file=Path(
+            os.path.join(base_folder, "../src/benchmarking/credentials_and_indexes/imagenet-val-classes.json")
+        ),
+        s3_credential_file=s3_credential_file,
+    )
+
+    train_dataset = get_dataset(
+        args.dataset,
+        dataset_type="train",
+        limit=args.dataset_limit,
+        use_cache=args.use_cache,
+        index_file=Path(os.path.join(base_folder, "../src/benchmarking/credentials_and_indexes/index-s3-train.json")),
+        classes_file=Path(
+            os.path.join(base_folder, "../src/benchmarking/credentials_and_indexes/imagenet-train-classes.json")
+        ),
+        s3_credential_file=s3_credential_file,
+    )
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)

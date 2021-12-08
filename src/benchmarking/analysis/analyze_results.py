@@ -2,7 +2,6 @@ import io
 import json
 import logging
 import re
-from collections import defaultdict
 from datetime import timedelta
 from json import JSONDecodeError
 from pathlib import Path
@@ -501,9 +500,8 @@ def extract_timelines(
     return df
 
 
-def show_timelines(df, run, colors, flat=False, zoom=False, zoom_epochs=1):
+def show_timelines(df, run, lanes, colors, flat=False, zoom=False, zoom_epochs=1):
     fig, ax = plt.subplots(figsize=(30, 20))
-    data = defaultdict(list)
     start = min(df["start_time_x"])
     end = max(df["end_time_y"])
 
@@ -514,7 +512,7 @@ def show_timelines(df, run, colors, flat=False, zoom=False, zoom_epochs=1):
         df = df[df["start_time_x"] < start + ((total_runtime / number_of_epochs) * zoom_epochs)]
 
     i = 0
-    for index, row in df.sort_values(["start_time_x"], ascending=True).iterrows():
+    for _, row in df.sort_values(["start_time_x"], ascending=True).iterrows():
         duration = row["end_time_y"] - row["start_time_x"]
         x1 = row["start_time_x"] - start
         if duration < 0.08:
@@ -528,8 +526,7 @@ def show_timelines(df, run, colors, flat=False, zoom=False, zoom_epochs=1):
         ax.plot([x1, x2], [lane, lane], color=colors[row["item_x"]], label=row["item_x"], linewidth=1)
     ax.set_xlabel("Experiment duration", loc="center")
     ax.set_ylabel("Item", loc="top")
-    # print(run.split('_'))
-    # ['20211109f152412', 'benchmark', 'e2e', 'lightning', 's3', '256', '4', '16', '1', 'vanilla', 'sync']
+    # ['20211109f152412', 'benchmark', 'e2e', 'lightning', 's3', '256', '4', '16', '1', 'vanilla', 'sync']  # noqa
     filename = run.split("_")
     ax.set_title(
         f"Runtime for each function, impl: {filename[9]},"
@@ -557,15 +554,12 @@ def show_timelines(df, run, colors, flat=False, zoom=False, zoom_epochs=1):
     plt.show()
 
 
-def show_timelines_with_gpu(df, gpu_util, colors, run, flat=False, show_gpu=False, zoom=False, zoom_epochs=1):
+def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_gpu=False, zoom=False, zoom_epochs=1):
     fig, ax = plt.subplots(figsize=(30, 25))
-    # fig, ax = plt.subplots()
     plt.rcParams.update({"font.size": 18})
-    data = defaultdict(list)
     start = min(df["start_time_x"])
     end = max(df["end_time_y"])
     gpu_start = min(gpu_util["timestamp"])
-    gpu_end = max(gpu_util["timestamp"])
 
     total_runtime = end - start
     number_of_epochs = 20
@@ -575,7 +569,7 @@ def show_timelines_with_gpu(df, gpu_util, colors, run, flat=False, show_gpu=Fals
         gpu_util = gpu_util[gpu_util["timestamp"] < gpu_start + ((total_runtime / number_of_epochs) * zoom_epochs)]
 
     lane = 0
-    for index, row in df.sort_values(["start_time_x"], ascending=True).iterrows():
+    for _, row in df.sort_values(["start_time_x"], ascending=True).iterrows():
         duration = row["end_time_y"] - row["start_time_x"]
         x1 = row["start_time_x"] - start
         if duration < 0.15:
@@ -608,7 +602,6 @@ def show_timelines_with_gpu(df, gpu_util, colors, run, flat=False, show_gpu=Fals
         ncol=5,
     )
 
-    gpu_util_mean = 0
     gpu_util_mean_no_zeros = 0
 
     if show_gpu:
@@ -658,16 +651,9 @@ def show_timelines_with_gpu(df, gpu_util, colors, run, flat=False, show_gpu=Fals
 
 
 def get_gpu_stats(df, gpu_util, run, flat=False, show_gpu=False, zoom=False, zoom_epochs=1):
-    data = defaultdict(list)
     start = min(df["start_time_x"])
     end = max(df["end_time_y"])
-    gpu_start = min(gpu_util["timestamp"])
-    gpu_end = max(gpu_util["timestamp"])
-
-    total_runtime = end - start
     filename = run.split("_")
-    gpu_util_mean = 0
-    gpu_util_mean_no_zeros = 0
 
     gpu_events = []
     for i in gpu_util["timestamp"]:
@@ -676,7 +662,6 @@ def get_gpu_stats(df, gpu_util, run, flat=False, show_gpu=False, zoom=False, zoo
     gpu_util_mean_no_zeros = np.mean(gpu_util[gpu_util["gpu_util_2"] > 0]["gpu_util_2"])
     mem_util_mean = np.mean(gpu_util["mem_util_2"])
     mem_util_mean_no_zeros = np.mean(gpu_util[gpu_util["mem_util_2"] > 0]["mem_util_2"])
-    #     print(gpu_util_mean_no_zeros, mem_util_mean_no_zeros)
 
     return {
         "runtime": end - start,
@@ -731,7 +716,6 @@ def plot_violins(throughput, title):
         data = data.values.tolist()
         all_data.append(data[:-3])
         labels.append(index)
-    # print(labels)
     ax.violinplot(all_data, vert=True, widths=0.5, showmeans=True)
 
     ax.xaxis.set_tick_params(direction="out")
@@ -742,6 +726,5 @@ def plot_violins(throughput, title):
     ax.set_xlabel("Experiment setup")
     ax.set_ylabel("Throughput (imgs/s)")
     ax.set_title(title)
-    # ax.set_xticks(range(len(labels)), labels=labels)
     ax.grid(linestyle="--", which="both")
     plt.plot()

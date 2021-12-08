@@ -1,5 +1,4 @@
 import json
-import os
 import platform
 from argparse import Namespace
 from datetime import datetime

@@ -39,3 +39,14 @@ src.benchmarking.analysis.analyze_results.get_thread_stats
 src.benchmarking.analysis.analyze_results.plot_throughput_per_storage
 src.benchmarking.analysis.analyze_results.plot_events_timeline
 src.benchmarking.analysis.analyze_results.extract_pandas
+src.benchmarking.analysis.analyze_results.extract_gpuutil
+src.benchmarking.analysis.analyze_results.extract_timelines
+src.benchmarking.analysis.analyze_results.show_timelines
+src.benchmarking.analysis.analyze_results.show_timelines_with_gpu
+src.benchmarking.analysis.analyze_results.gpu_end
+src.benchmarking.analysis.analyze_results.gpu_util_mean
+src.benchmarking.analysis.analyze_results.get_gpu_stats
+src.benchmarking.analysis.analyze_results.gpu_end
+src.benchmarking.analysis.analyze_results.gpu_util_mean
+src.benchmarking.analysis.analyze_results.plot_all_histograms
+src.benchmarking.analysis.analyze_results.plot_violins
