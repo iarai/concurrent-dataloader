@@ -1,7 +1,7 @@
 for fetch_impl in "threaded" "asyncio" "vanilla" ; do
   for storage in "s3" "scratch"; do
-    for implementation in "train/imagenet_torch.py" "train/imagenet_lightning.py" ; do
-        python3 "${implementation}" --output_base_folder /iarai/home/ivan.svogor/git/storage-benchmarking/src/benchmark_output/1711-long \
+    for implementation in "../../experiment_src/e2e_imagenet_torch.py" "../../experiment_src/e2e_imagenet_lightning.py" ; do
+        python3 "${implementation}" --output_base_folder "../../../../benchmark_output/1711-long" \
         --dataset "${storage}" \
         --num-fetch-workers 16 \
         --num-workers 4 \
