@@ -218,9 +218,39 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
 
     cudnn.benchmark = True
 
+    # get the credentials and indexes
+    base_folder = os.path.dirname(__file__)
+    s3_credential_file = os.path.join(
+        base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json"
+    )
+    val_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-val.json"
+    train_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-train.json"
+
+
     # create datasets
-    val_dataset = get_dataset(args.dataset, dataset_type="val", limit=args.dataset_limit, use_cache=args.use_cache)
-    train_dataset = get_dataset(args.dataset, dataset_type="train", limit=args.dataset_limit, use_cache=args.use_cache)
+    val_dataset = get_dataset(
+        args.dataset,
+        dataset_type="val",
+        limit=args.dataset_limit,
+        use_cache=args.use_cache,
+        index_file=Path(os.path.join(base_folder, val_dataset_index)),
+        classes_file=Path(
+            os.path.join(base_folder, "../credentials_and_indexes/imagenet-val-classes.json")
+        ),
+        s3_credential_file=s3_credential_file,
+    )
+
+    train_dataset = get_dataset(
+        args.dataset,
+        dataset_type="train",
+        limit=args.dataset_limit,
+        use_cache=args.use_cache,
+        index_file=Path(os.path.join(base_folder, train_dataset_index)),
+        classes_file=Path(
+            os.path.join(base_folder, "../credentials_and_indexes/imagenet-train-classes.json")
+        ),
+        s3_credential_file=s3_credential_file,
+    )
 
     if args.distributed:
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
@@ -234,6 +264,8 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
 
     val_dataset.set_transform(transform)
     train_dataset.set_transform(transform)
+
+    
     if args.fetch_impl == "vanilla":
         train_loader = DataLoaderVanilla(
             dataset=train_dataset,

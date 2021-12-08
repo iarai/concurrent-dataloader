@@ -211,11 +211,15 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
 
     cudnn.benchmark = True
 
+    # Process creation method
+    torch.multiprocessing.set_start_method("fork") 
+
     # get the credentials and indexes
     base_folder = os.path.dirname(__file__)
-    s3_credential_file = os.path.join(
-        base_folder, "../src/benchmarking/credentials_and_indexes/s3_iarai_playground_imagenet.json"
-    )
+    s3_credential_file = os.path.join(base_folder, 
+                                      "../src/benchmarking/credentials_and_indexes/s3_iarai_playground_imagenet.json")
+    val_dataset_index = f"../src/benchmarking/credentials_and_indexes/index-{args.dataset}-val.json"
+    train_dataset_index = f"../src/benchmarking/credentials_and_indexes/index-{args.dataset}-train.json"
 
     # create datasets
     val_dataset = get_dataset(
@@ -223,7 +227,7 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
         dataset_type="val",
         limit=args.dataset_limit,
         use_cache=args.use_cache,
-        index_file=Path(os.path.join(base_folder, "../src/benchmarking/credentials_and_indexes/index-s3-val.json")),
+        index_file=Path(os.path.join(base_folder, val_dataset_index)),
         classes_file=Path(
             os.path.join(base_folder, "../src/benchmarking/credentials_and_indexes/imagenet-val-classes.json")
         ),
@@ -235,7 +239,7 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
         dataset_type="train",
         limit=args.dataset_limit,
         use_cache=args.use_cache,
-        index_file=Path(os.path.join(base_folder, "../src/benchmarking/credentials_and_indexes/index-s3-train.json")),
+        index_file=Path(os.path.join(base_folder, train_dataset_index)),
         classes_file=Path(
             os.path.join(base_folder, "../src/benchmarking/credentials_and_indexes/imagenet-train-classes.json")
         ),
