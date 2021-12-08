@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 import torch.cuda
-from src.faster_dataloader.dataset.scratch_dataset import ScratchDataset
 
 from src.benchmarking.analysis.analyze_results import parse_results_log
+from src.faster_dataloader.dataset.scratch_dataset import ScratchDataset
 
 
 # TODO add s3 etc. if available

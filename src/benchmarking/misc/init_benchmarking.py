@@ -44,12 +44,14 @@ def parse_args_file(json_file, dataset_type):
 
 def get_dataset(
     dataset: str,
+    index_file: str,
+    classes_file: str,
+    use_cache: False,
     dataset_type: str = "val",
-    use_cache=False,
     additional_args: Optional[Any] = None,
     limit: Optional[int] = None,
+    s3_credential_file: Optional[str] = None,
 ):
-    base_folder = os.path.dirname(__file__)
     if dataset == "t4c":
         # TODO magic constants... extract to cli... how to do in a generic way...
         dataset = T4CDataset(
@@ -67,24 +69,14 @@ def get_dataset(
             endpoint = "http://s3.amazonaws.com"
         dataset = S3Dataset(
             # TODO magic constants... extract to cli... how to do in a generic way...
-            **parse_args_file(
-                os.path.join(base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json"), dataset_type
-            ),
-            index_file=Path(os.path.join(base_folder, f"../credentials_and_indexes/index-s3-{dataset_type}.json")),
-            classes_file=Path(
-                os.path.join(base_folder, f"../credentials_and_indexes/imagenet-{dataset_type}-classes.json")
-            ),
+            **parse_args_file(s3_credential_file, dataset_type),
+            index_file=index_file,
+            classes_file=classes_file,
             limit=limit,
             endpoint_url=endpoint,
             use_cache=use_cache,
         )
     elif dataset == "scratch":
-        dataset = ScratchDataset(
-            index_file=Path(os.path.join(base_folder, f"../credentials_and_indexes/index-scratch-{dataset_type}.json")),
-            classes_file=Path(
-                os.path.join(base_folder, f"../credentials_and_indexes/imagenet-{dataset_type}-classes.json")
-            ),
-            limit=limit,
-        )
+        dataset = ScratchDataset(index_file=index_file, classes_file=classes_file, limit=limit,)
     print(f"Dataset loaded ... {dataset}, {dataset_type}, {len(dataset)}")
     return dataset
