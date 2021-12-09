@@ -20,7 +20,7 @@ from torch.utils.data._utils import IS_WINDOWS
 from torch.utils.data._utils import MP_STATUS_CHECK_INTERVAL
 from torch.utils.data._utils import signal_handling
 
-from src.benchmarking.misc.time_helper import stopwatch
+from benchmarking.misc.time_helper import stopwatch
 
 # \\
 # // Modified: added for logging
@@ -279,7 +279,7 @@ def _worker_loop(
         global _worker_info
         _worker_info = WorkerInfo(id=worker_id, num_workers=num_workers, seed=seed, dataset=dataset)
 
-        from src.faster_dataloader.dataloader_mod.dataloader import _DatasetKind
+        from faster_dataloader.dataloader_mod.dataloader import _DatasetKind
 
         init_exception = None
 

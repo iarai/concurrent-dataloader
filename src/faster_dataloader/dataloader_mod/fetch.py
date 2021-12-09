@@ -13,7 +13,7 @@ from typing import List
 from torch import Tensor
 from torch.utils.data import Dataset
 
-from src.benchmarking.misc.time_helper import stopwatch
+from benchmarking.misc.time_helper import stopwatch
 
 # \\
 

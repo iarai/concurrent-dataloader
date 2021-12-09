@@ -35,11 +35,11 @@ from torch.utils.data import RandomSampler
 from torch.utils.data import Sampler
 from torch.utils.data import SequentialSampler
 
-from src.faster_dataloader.dataloader_mod.fetch import _AsyncMapDatasetFetcher
-from src.faster_dataloader.dataloader_mod.fetch import _IterableDatasetFetcher
-from src.faster_dataloader.dataloader_mod.fetch import _MapDatasetFetcher
-from src.faster_dataloader.dataloader_mod.fetch import _ThreadedMapDatasetFetcher
-from src.faster_dataloader.dataloader_mod.worker import get_worker_info
+from faster_dataloader.dataloader_mod.fetch import _IterableDatasetFetcher
+from faster_dataloader.dataloader_mod.fetch import _MapDatasetFetcher
+from faster_dataloader.dataloader_mod.fetch import _ThreadedMapDatasetFetcher
+from faster_dataloader.dataloader_mod.fetch import _AsyncMapDatasetFetcher
+from faster_dataloader.dataloader_mod.worker import get_worker_info
 
 # \\
 # // Modified:  multiprocessing

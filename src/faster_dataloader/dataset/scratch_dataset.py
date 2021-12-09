@@ -7,9 +7,9 @@ from overrides import overrides
 from PIL import Image
 from torchvision import transforms
 
-from src.benchmarking.misc.random_generator import RandomGenerator
-from src.benchmarking.misc.time_helper import stopwatch
-from src.faster_dataloader.dataset.indexed_dataset import IndexedDataset
+from benchmarking.misc.random_generator import RandomGenerator
+from benchmarking.misc.time_helper import stopwatch
+from faster_dataloader.dataset.indexed_dataset import IndexedDataset
 
 
 class ScratchDataset(IndexedDataset):
