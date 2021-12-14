@@ -408,4 +408,7 @@ def accuracy(output, target, topk=(1,)):
 
 
 if __name__ == "__main__":
+    start = time.time()
     main()
+    end = time.time()
+    print(f"Result: {end-start}")
