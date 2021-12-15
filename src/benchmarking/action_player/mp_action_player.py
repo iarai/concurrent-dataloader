@@ -5,8 +5,8 @@ from multiprocessing import set_start_method
 from pathlib import Path
 from typing import Callable
 
-from action_player.action_player import ActionPlayer
-from misc.logging_configuration import initialize_logging
+from benchmarking.action_player.action_player import ActionPlayer
+from benchmarking.misc.logging_configuration import initialize_logging
 
 try:
     set_start_method("spawn")

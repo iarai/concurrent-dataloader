@@ -18,14 +18,14 @@ import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
 
-from src.benchmarking.misc.gpulogger import GPUSidecarLogger
-from src.benchmarking.misc.init_benchmarking import get_dataset
-from src.benchmarking.misc.init_benchmarking import init_benchmarking
-from src.benchmarking.misc.logging_configuration import initialize_logging
-from src.faster_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
-from src.faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
-from src.faster_dataloader.dataloader_vanilla.dataloader import DataLoader as DataLoaderVanilla
-from src.faster_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
+from benchmarking.misc.gpulogger import GPUSidecarLogger
+from benchmarking.misc.init_benchmarking import get_dataset
+from benchmarking.misc.init_benchmarking import init_benchmarking
+from benchmarking.misc.logging_configuration import initialize_logging
+from faster_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
+from faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
+from faster_dataloader.dataloader_vanilla.dataloader import DataLoader as DataLoaderVanilla
+from faster_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
 
 model_names = sorted(
     name for name in models.__dict__ if name.islower() and not name.startswith("__") and callable(models.__dict__[name])

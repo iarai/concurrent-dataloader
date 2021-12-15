@@ -7,10 +7,10 @@ from typing import Callable
 from typing import Type
 
 import torch
-from action_player.action_player import ActionPlayer
-from action_player.mp_action_player import MPActionPlayer
-from main import init_benchmarking
-from misc.random_generator import RandomGenerator
+from benchmarking.action_player.action_player import ActionPlayer
+from benchmarking.action_player.mp_action_player import MPActionPlayer
+from benchmarking.misc.init_benchmarking import init_benchmarking
+from benchmarking.misc.random_generator import RandomGenerator
 from PIL import Image
 from torchvision import transforms
 

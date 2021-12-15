@@ -33,9 +33,9 @@ from torch.utils.data import RandomSampler
 from torch.utils.data import Sampler
 from torch.utils.data import SequentialSampler
 
-from src.faster_dataloader.dataloader_vanilla.fetch import _IterableDatasetFetcher
-from src.faster_dataloader.dataloader_vanilla.fetch import _MapDatasetFetcher
-from src.faster_dataloader.dataloader_vanilla.worker import get_worker_info
+from faster_dataloader.dataloader_vanilla.fetch import _IterableDatasetFetcher
+from faster_dataloader.dataloader_vanilla.fetch import _MapDatasetFetcher
+from faster_dataloader.dataloader_vanilla.worker import get_worker_info
 
 # // Modified: imports that needed to be imported due to dataloader.py non standard location
 # \\

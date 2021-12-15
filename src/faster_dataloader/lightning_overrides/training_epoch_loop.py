@@ -33,7 +33,7 @@ from pytorch_lightning.utilities.signature_utils import is_param_in_hook_signatu
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 from pytorch_lightning.utilities.warnings import WarningCache
 
-from src.benchmarking.misc.time_helper import stopwatch
+from benchmarking.misc.time_helper import stopwatch
 
 
 class TrainingEpochLoop(loops.Loop):
