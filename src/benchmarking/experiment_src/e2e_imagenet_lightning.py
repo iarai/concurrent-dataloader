@@ -36,16 +36,16 @@ from pytorch_lightning.callbacks import GPUStatsMonitor
 from pytorch_lightning.core import LightningModule
 from pytorch_lightning.profiler import SimpleProfiler
 
-from benchmarking.misc.gpulogger import GPUSidecarLogger
-from benchmarking.misc.init_benchmarking import get_dataset
-from benchmarking.misc.init_benchmarking import init_benchmarking
-from benchmarking.misc.logging_configuration import initialize_logging
-from benchmarking.misc.time_helper import stopwatch
-from faster_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
-from faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
-from faster_dataloader.dataloader_vanilla.dataloader import DataLoader as DataLoaderVanilla
-from faster_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
-from faster_dataloader.lightning_overrides import training_epoch_loop
+from src.benchmarking.misc.gpulogger import GPUSidecarLogger
+from src.benchmarking.misc.init_benchmarking import get_dataset
+from src.benchmarking.misc.init_benchmarking import init_benchmarking
+from src.benchmarking.misc.logging_configuration import initialize_logging
+from src.benchmarking.misc.time_helper import stopwatch
+from src.faster_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
+from src.faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
+from src.faster_dataloader.dataloader_vanilla.dataloader import DataLoader as DataLoaderVanilla
+from src.faster_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
+from src.faster_dataloader.lightning_overrides import training_epoch_loop
 
 
 class ImageNetLightningModel(LightningModule):
@@ -334,7 +334,7 @@ def run_cli():
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
     if torch.cuda.device_count() > 0:
-        parser.set_defaults(deterministic=True, max_epochs=10, gpus=[2])
+        parser.set_defaults(deterministic=True, max_epochs=80, gpus=[2])
     else:
         parser.set_defaults(deterministic=True, max_epochs=3)
     args = parser.parse_args()

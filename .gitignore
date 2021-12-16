@@ -152,3 +152,4 @@ src/faster_dataloader/lightning_logs/
 .tar
 .tar.gz
 src/faster_dataloader/benchmark_output.tar.gz
+benchmark_output/*

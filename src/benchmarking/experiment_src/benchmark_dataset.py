@@ -122,9 +122,7 @@ def main(*args):
         parser.print_help()
         exit(2)
 
-    benchmark_dataset(
-        dataset=dataset, **benchmark_args,
-    )
+    benchmark_dataset(dataset=dataset, **benchmark_args,)
 
 
 if __name__ == "__main__":

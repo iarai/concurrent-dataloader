@@ -1,14 +1,14 @@
 import argparse
 import logging
 import sys
+import os
+import torch
+
+from torch import Tensor
 from functools import partial
 from pathlib import Path
 from typing import List
 from typing import Optional
-from torch.functional import Tensor
-
-import torch
-import os
 
 from benchmarking.action_player.action_player import ActionPlayer
 from faster_dataloader.dataset.indexed_dataset import IndexedDataset
