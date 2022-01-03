@@ -264,7 +264,7 @@ def _worker_loop(  # noqa
         global _worker_info
         _worker_info = WorkerInfo(id=worker_id, num_workers=num_workers, seed=seed, dataset=dataset)
 
-        from torch_overrides_vanilla.dataloader import _DatasetKind
+        from faster_dataloader.dataloader_vanilla.dataloader import _DatasetKind
 
         init_exception = None
 
