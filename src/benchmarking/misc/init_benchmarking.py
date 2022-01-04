@@ -79,9 +79,11 @@ def get_dataset(
             classes_file=classes_file,
             limit=limit,
             endpoint_url=endpoint,
-            use_cache=use_cache,
+            use_cache=use_cache
         )
     elif dataset == "scratch":
         dataset = ScratchDataset(index_file=index_file, classes_file=classes_file, limit=limit,)
+    elif dataset == "glusterfs":
+        dataset = ScratchDataset(index_file=index_file, classes_file=classes_file, limit=limit, local_path="/iarai/home/ivan.svogor/temp")
     print(f"Dataset loaded ... {dataset}, {dataset_type}, {len(dataset)}")
     return dataset

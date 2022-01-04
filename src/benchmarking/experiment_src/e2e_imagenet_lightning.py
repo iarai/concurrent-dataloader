@@ -178,21 +178,21 @@ def main(args: Namespace) -> None:
         base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json"
     )
 
-    val_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-val.json"
+    # val_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-val.json"
     train_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-train.json"
 
     # create datasets
-    val_dataset = get_dataset(
-        args.dataset,
-        dataset_type="val",
-        limit=args.dataset_limit,
-        use_cache=args.use_cache,
-        index_file=Path(os.path.join(base_folder, val_dataset_index)),
-        classes_file=Path(
-            os.path.join(base_folder, "../credentials_and_indexes/imagenet-val-classes.json")
-        ),
-        s3_credential_file=s3_credential_file,
-    )
+    # val_dataset = get_dataset(
+    #     args.dataset,
+    #     dataset_type="val",
+    #     limit=args.dataset_limit,
+    #     use_cache=args.use_cache,
+    #     index_file=Path(os.path.join(base_folder, val_dataset_index)),
+    #     classes_file=Path(
+    #         os.path.join(base_folder, "../credentials_and_indexes/imagenet-val-classes.json")
+    #     ),
+    #     s3_credential_file=s3_credential_file,
+    # )
 
     train_dataset = get_dataset(
         args.dataset,
@@ -211,7 +211,7 @@ def main(args: Namespace) -> None:
         [transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(), normalize]
     )
 
-    val_dataset.set_transform(transform)
+    # val_dataset.set_transform(transform)
     train_dataset.set_transform(transform)
     if args.fetch_impl == "vanilla":
         train_data_loader = DataLoaderVanilla(

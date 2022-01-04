@@ -13,11 +13,12 @@ from faster_dataloader.dataset.indexed_dataset import IndexedDataset
 
 
 class ScratchDataset(IndexedDataset):
-    def __init__(self, index_file: Path, classes_file: Optional[Path] = None, limit: int = None) -> None:
+    def __init__(self, index_file: Path, classes_file: Optional[Path] = None, limit: int = None, local_path: Optional[Path] = None) -> None:
         self.limit = limit
         self.classes_file = classes_file
         self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
         self.rng = RandomGenerator()
+        self.local_path = local_path
         super().__init__(index_file=index_file, classes_file=classes_file)
 
     @staticmethod
@@ -42,7 +43,9 @@ class ScratchDataset(IndexedDataset):
     # TODO we should make this code independent of the underlying dataset, not necessarily images/imagenet?
     @stopwatch(trace_name="(5)-get_item", trace_level=5, strip_result=True)
     def __getitem__(self, index) -> Image:
-        class_folder_name = self.image_paths[index].split("/")[4]
+        
+        class_folder_name = self.image_paths[index].split("/")[2]
+        
         if self.classes is not None:
             # validation dataset
             if class_folder_name.startswith("ILSV"):
@@ -59,10 +62,7 @@ class ScratchDataset(IndexedDataset):
         else:
             target = None
 
-        image_path = self.image_paths[index]
-        image = Image.open(image_path)
-
-        image_path = self.image_paths[index]
+        image_path = self.local_path + "/" + self.image_paths[index]
         image = Image.open(image_path)
 
         # some images in the scratch dataset seem to be in "L" instead of "RGB" mode
