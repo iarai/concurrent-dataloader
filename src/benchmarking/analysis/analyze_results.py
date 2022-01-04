@@ -223,10 +223,11 @@ def plot_throughput_per_storage(df, group_by: List[str]):
     )
 
     fig, ax1 = plt.subplots(figsize=(50, 10))
-    ax1.set_ylim([0, min(2000, df_grouped_by_run["throughput [Mbit/s]"].max())])
+    ax1.set_ylim([0, max(200, df_grouped_by_run["throughput [Mbit/s]"].max())])
     ax2 = ax1.twinx()
     cmap = plt.cm.get_cmap("Set1")
 
+    result = []
     # TODO loop over groups instead
     for i, dataset in enumerate(["s3", "scratch"]):
         df = df_aggregated_over_runs[df_aggregated_over_runs["dataset"] == dataset]
@@ -254,6 +255,8 @@ def plot_throughput_per_storage(df, group_by: List[str]):
             label=f"{storage} request_time",
             linestyle="dashed",
         )
+        # result.append({str(dataset): [df["throughput [Mbit/s]"], df2["median_request_time"]]})
+        result.append({"dataset": dataset, "throughput": df["throughput [Mbit/s]"], "median_request_time": df2["median_request_time"]})
 
     fig.legend(handlelength=5)
 
@@ -261,6 +264,7 @@ def plot_throughput_per_storage(df, group_by: List[str]):
     ax1.set_xlabel(f"{x_label} [#processes]")
     ax1.set_title(f"Storage benchmarking {nodes} {list(collected.keys())}")
     ax2.set_ylabel("Request time [s]")
+    return result
 
 
 def plot_events_timeline(
