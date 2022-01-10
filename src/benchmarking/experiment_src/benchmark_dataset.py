@@ -16,7 +16,7 @@ def benchmark_dataset(
         output_base_folder: Path,
         pool_size: int = 5,
         num_index_all=0,
-        num_load_index=5,
+        num_load_index=1,
         num_get_random_item=10000,
 ) -> None:
     if pool_size == 0:

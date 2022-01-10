@@ -13,12 +13,6 @@ from faster_dataloader.dataset.scratch_dataset import ScratchDataset
 from faster_dataloader.dataset.t4c_s3_dataset import HDF5S3MODE
 from faster_dataloader.dataset.t4c_s3_dataset import T4CDataset
 
-# from src.benchmarking.misc.logging_configuration import initialize_logging
-# from src.faster_dataloader.dataset.s3_dataset import S3Dataset
-# from src.faster_dataloader.dataset.scratch_dataset import ScratchDataset
-# from src.faster_dataloader.dataset.t4c_s3_dataset import HDF5S3MODE
-# from src.faster_dataloader.dataset.t4c_s3_dataset import T4CDataset
-
 def init_benchmarking(args: Namespace, action: str, loglevel: str = "INFO"):
     ts = datetime.now().strftime("%Y%m%df%H%M%S")
     output_base_folder = args.output_base_folder / f"{ts}_{action}"
