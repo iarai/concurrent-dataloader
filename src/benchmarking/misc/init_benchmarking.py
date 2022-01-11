@@ -6,12 +6,14 @@ from pathlib import Path
 from typing import Any
 from typing import Optional
 
-# if installed:
 from benchmarking.misc.logging_configuration import initialize_logging
-from faster_dataloader.dataset.s3_dataset import S3Dataset
-from faster_dataloader.dataset.scratch_dataset import ScratchDataset
-from faster_dataloader.dataset.t4c_s3_dataset import HDF5S3MODE
-from faster_dataloader.dataset.t4c_s3_dataset import T4CDataset
+from concurrent_dataloader.dataset.s3_dataset import S3Dataset
+from concurrent_dataloader.dataset.scratch_dataset import ScratchDataset
+from concurrent_dataloader.dataset.t4c_s3_dataset import HDF5S3MODE
+from concurrent_dataloader.dataset.t4c_s3_dataset import T4CDataset
+
+# if installed:
+
 
 def init_benchmarking(args: Namespace, action: str, loglevel: str = "INFO"):
     ts = datetime.now().strftime("%Y%m%df%H%M%S")
@@ -73,11 +75,13 @@ def get_dataset(
             classes_file=classes_file,
             limit=limit,
             endpoint_url=endpoint,
-            use_cache=use_cache
+            use_cache=use_cache,
         )
     elif dataset == "scratch":
         dataset = ScratchDataset(index_file=index_file, classes_file=classes_file, limit=limit,)
     elif dataset == "glusterfs":
-        dataset = ScratchDataset(index_file=index_file, classes_file=classes_file, limit=limit, local_path="/iarai/home/ivan.svogor/temp")
+        dataset = ScratchDataset(
+            index_file=index_file, classes_file=classes_file, limit=limit, local_path="/iarai/home/ivan.svogor/temp"
+        )
     print(f"Dataset loaded ... {dataset}, {dataset_type}, {len(dataset)}")
     return dataset

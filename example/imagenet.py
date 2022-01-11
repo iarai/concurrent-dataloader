@@ -17,8 +17,8 @@ import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
 from benchmarking.misc.init_benchmarking import get_dataset
-from faster_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
-from faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
+from concurrent_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
+from concurrent_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
 
 model_names = sorted(
     name for name in models.__dict__ if name.islower() and not name.startswith("__") and callable(models.__dict__[name])
@@ -212,12 +212,13 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
     cudnn.benchmark = True
 
     # Process creation method
-    torch.multiprocessing.set_start_method("fork") 
+    torch.multiprocessing.set_start_method("fork")
 
     # get the credentials and indexes
     base_folder = os.path.dirname(__file__)
-    s3_credential_file = os.path.join(base_folder, 
-                                      "../src/benchmarking/credentials_and_indexes/s3_iarai_playground_imagenet.json")
+    s3_credential_file = os.path.join(
+        base_folder, "../src/benchmarking/credentials_and_indexes/s3_iarai_playground_imagenet.json"
+    )
     val_dataset_index = f"../src/benchmarking/credentials_and_indexes/index-{args.dataset}-val.json"
     train_dataset_index = f"../src/benchmarking/credentials_and_indexes/index-{args.dataset}-train.json"
 
@@ -417,4 +418,3 @@ if __name__ == "__main__":
     main()
     end = time.time()
     print(f"Result: {end-start}")
-

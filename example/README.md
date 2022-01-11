@@ -12,7 +12,7 @@ or use the git repo with pip:
 pip install git+http://url.todo
 ```
 
-## Running the example 
+## Running the example
 
 IMPORTANT: Make sure to create index, classes and credential files (described in the following section),
 
@@ -29,7 +29,7 @@ python imagenet.py --help
 
 ## Usage
 
-For usage, consider `imagenet.py` project, which is essentially a [default implementation](https://github.com/pytorch/examples/blob/master/imagenet/main.py) provided by PyTorch. However, for clarity, some parts are removed. 
+For usage, consider `imagenet.py` project, which is essentially a [default implementation](https://github.com/pytorch/examples/blob/master/imagenet/main.py) provided by PyTorch. However, for clarity, some parts are removed.
 
 To use the library, you need to make sure to create:
 
@@ -40,27 +40,27 @@ To use the library, you need to make sure to create:
 
 ### 1. Training file index
 
-Normally, a `Dataset` instance is dealing with accessing raw files, which usually involves pointing to a directory, 
+Normally, a `Dataset` instance is dealing with accessing raw files, which usually involves pointing to a directory,
 listing all files, i.e. reading their names in a local variable, and later on return individual images using the `__getitem__` function.
 However, with large datasets, listing folders can take some time, particularly during the coding phase, when still exploring
-different parameters for the model. To overcome that issue, one can create a file index once, and then use it for subsequent 
+different parameters for the model. To overcome that issue, one can create a file index once, and then use it for subsequent
 runs to access file directly. Here, we suggest a simple approach with a single list of paths, like:
 
 ```json
-["scratch/imagenet/train/n01440764/n01440764_10026.JPEG", 
-"scratch/imagenet/train/n01440764/n01440764_10027.JPEG", 
-"scratch/imagenet/train/n01440764/n01440764_10029.JPEG", 
-"scratch/imagenet/train/n01440764/n01440764_10040.JPEG", 
-"scratch/imagenet/train/n01440764/n01440764_10042.JPEG", 
-"scratch/imagenet/train/n01440764/n01440764_10043.JPEG", 
+["scratch/imagenet/train/n01440764/n01440764_10026.JPEG",
+"scratch/imagenet/train/n01440764/n01440764_10027.JPEG",
+"scratch/imagenet/train/n01440764/n01440764_10029.JPEG",
+"scratch/imagenet/train/n01440764/n01440764_10040.JPEG",
+"scratch/imagenet/train/n01440764/n01440764_10042.JPEG",
+"scratch/imagenet/train/n01440764/n01440764_10043.JPEG",
 ...]
 ```
 
 Similarly, an index can be created for a validation dataset and a test dataset.
 
-### 2. Classes file 
+### 2. Classes file
 
-Classes file is another `json` which associates each file in the file index, with its class. Imagenet uses 1000 classes, and each of 
+Classes file is another `json` which associates each file in the file index, with its class. Imagenet uses 1000 classes, and each of
 them has a textual name and an index. The association is made by the file name prefix, e.g. for `n01440764_10026.JPEG`, `n01440764` is the key
 in the classes file, used to obtain its class. An example classes index structure is shown below:
 
@@ -96,9 +96,9 @@ Similarly, a validation classes file can be created with the following structure
 "3": 822,
 ...
 ```
-where the key is the index of the image, and the value is its class. 
+where the key is the index of the image, and the value is its class.
 
-`S3_Dataset` (`s3_dataset.py`) can also create an index file, and upload it to S3-like storage.  
+`S3_Dataset` (`s3_dataset.py`) can also create an index file, and upload it to S3-like storage.
 
 TODO: write how
 
@@ -120,7 +120,7 @@ Also, this file can be extended to point to the other files used here, that migh
   "aws_access_key_id": "...",
   "aws_secret_access_key": "...",
   "bucket_name": "my_bucket",
-  "train_classes_file_download_url": "s3://path/to/my_stuff/imagenet-train-classes.json", 
+  "train_classes_file_download_url": "s3://path/to/my_stuff/imagenet-train-classes.json",
   "val_classes_file_download_url": "s3://path/to/my_stuff/imagenet-val-classes.json",
   "val_index_file_download_url": "s3://path/to/my_stuff/index-s3-val.json",
   "train_index_file_download_url": "s3://path/to/my_stuff/index-s3-train.json",
@@ -129,7 +129,7 @@ Also, this file can be extended to point to the other files used here, that migh
 
 ```
 
-When using the default `S3_Dataset` This file is used only if the `~/.aws` credentials are not present. 
+When using the default `S3_Dataset` This file is used only if the `~/.aws` credentials are not present.
 
 ### 4) Modify the data loading code
 
@@ -137,14 +137,14 @@ When using the default `S3_Dataset` This file is used only if the `~/.aws` crede
 
 ```python
 from benchmarking.misc.init_benchmarking import get_dataset
-from faster_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
-from faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
+from concurrent_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
+from concurrent_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
 ```
 
 #### 2. Set the process creation method (at any setup point, before creating Dataset instances)
 
 ```python
-    torch.multiprocessing.set_start_method("fork") 
+    torch.multiprocessing.set_start_method("fork")
 ```
 
 #### 3. Create datasets
@@ -156,10 +156,10 @@ from faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop
     s3_credential_file = os.path.join(base_folder, "path/to/json/files/s3_credentials.json")
     # get index file names (in this case, shown only for the training dataset)
     train_dataset_index = f"path/to/json/files/index-{args.dataset}-train.json"
-    
+
     # create a training dataset
     train_dataset = get_dataset(
-        args.dataset,               # S3 or scratch (local storage) 
+        args.dataset,               # S3 or scratch (local storage)
         dataset_type="train",       # train or val(idation)
         limit=args.dataset_limit,   # max number of loaded items, dataset size
         use_cache=args.use_cache,   # use caching?
@@ -169,19 +169,19 @@ from faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop
     )
 ```
 
-#### 4. Create dataloaders 
+#### 4. Create dataloaders
 
 ```python
     # set transform (if data needs any)
     train_dataset.set_transform(transform)
 
     # Create the dataloader
-    train_loader = DataLoaderParallel(  
+    train_loader = DataLoaderParallel(
         dataset=train_dataset,                              # standard parameters
         batch_size=args.batch_size,                         # ...
         num_workers=args.num_workers,
-        shuffle=(train_sampler is None),                    
-        prefetch_factor=args.prefetch_factor,               
+        shuffle=(train_sampler is None),
+        prefetch_factor=args.prefetch_factor,
         num_fetch_workers=args.num_fetch_workers,           # parallel threads used to load data
         fetch_impl=args.fetch_impl,                         # threads or asyncio
         batch_pool=args.batch_pool,                         # only for threaded implementation (pool of pre-loaded batches)
@@ -191,7 +191,7 @@ from faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop
 
 #### 5. Override the default Torch worker loop
 
-Usually before using torch, or just after the previous code, point the standard `_worker_loop` to the modified one: 
+Usually before using torch, or just after the previous code, point the standard `_worker_loop` to the modified one:
 
 ```python
     torch.utils.data._utils.worker._worker_loop = _worker_loop_parallel
@@ -221,10 +221,3 @@ Make sure that `.json` index, credential and class files exist, and then, simply
 ```
 !python imagenet.py --dataset-limit 3000
 ```
-
-
-
-
-
-
-

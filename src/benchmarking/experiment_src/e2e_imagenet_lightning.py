@@ -14,12 +14,12 @@
 """This example is largely adapted from
 https://github.com/pytorch/examples/blob/master/imagenet/main.py."""
 import logging
+import os
 import time
 from argparse import ArgumentParser
 from argparse import Namespace
 from functools import partial
 from pathlib import Path
-import os
 
 import pytorch_lightning as pl
 import pytorch_lightning.accelerators
@@ -31,21 +31,21 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
-from pytorch_lightning import loggers as pl_loggers
-from pytorch_lightning.callbacks import GPUStatsMonitor
-from pytorch_lightning.core import LightningModule
-from pytorch_lightning.profiler import SimpleProfiler
-
 from benchmarking.misc.gpulogger import GPUSidecarLogger
 from benchmarking.misc.init_benchmarking import get_dataset
 from benchmarking.misc.init_benchmarking import init_benchmarking
 from benchmarking.misc.logging_configuration import initialize_logging
 from benchmarking.misc.time_helper import stopwatch
-from faster_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
-from faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
-from faster_dataloader.dataloader_vanilla.dataloader import DataLoader as DataLoaderVanilla
-from faster_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
-from faster_dataloader.lightning_overrides import training_epoch_loop
+from concurrent_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
+from concurrent_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
+from concurrent_dataloader.dataloader_vanilla.dataloader import DataLoader as DataLoaderVanilla
+from concurrent_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
+from concurrent_dataloader.lightning_overrides import training_epoch_loop
+from pytorch_lightning import loggers as pl_loggers
+from pytorch_lightning.callbacks import GPUStatsMonitor
+from pytorch_lightning.core import LightningModule
+from pytorch_lightning.profiler import SimpleProfiler
+
 
 class ImageNetLightningModel(LightningModule):
     """
@@ -174,25 +174,9 @@ class ImageNetLightningModel(LightningModule):
 def main(args: Namespace) -> None:
     # get the credentials and indexes
     base_folder = os.path.dirname(__file__)
-    s3_credential_file = os.path.join(
-        base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json"
-    )
+    s3_credential_file = os.path.join(base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json")
 
-    # val_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-val.json"
     train_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-train.json"
-
-    # create datasets
-    # val_dataset = get_dataset(
-    #     args.dataset,
-    #     dataset_type="val",
-    #     limit=args.dataset_limit,
-    #     use_cache=args.use_cache,
-    #     index_file=Path(os.path.join(base_folder, val_dataset_index)),
-    #     classes_file=Path(
-    #         os.path.join(base_folder, "../credentials_and_indexes/imagenet-val-classes.json")
-    #     ),
-    #     s3_credential_file=s3_credential_file,
-    # )
 
     train_dataset = get_dataset(
         args.dataset,
@@ -200,9 +184,7 @@ def main(args: Namespace) -> None:
         limit=args.dataset_limit,
         use_cache=args.use_cache,
         index_file=Path(os.path.join(base_folder, train_dataset_index)),
-        classes_file=Path(
-            os.path.join(base_folder, "../credentials_and_indexes/imagenet-train-classes.json")
-        ),
+        classes_file=Path(os.path.join(base_folder, "../credentials_and_indexes/imagenet-train-classes.json")),
         s3_credential_file=s3_credential_file,
     )
 
@@ -211,7 +193,6 @@ def main(args: Namespace) -> None:
         [transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(), normalize]
     )
 
-    # val_dataset.set_transform(transform)
     train_dataset.set_transform(transform)
     if args.fetch_impl == "vanilla":
         train_data_loader = DataLoaderVanilla(
@@ -279,13 +260,16 @@ def main(args: Namespace) -> None:
     if torch.cuda.device_count() > 0:
         trainer = pl.Trainer.from_argparse_args(
             args,
+            max_epochs=args.epochs,
             profiler=profiler,
             logger=tb_logger,
             log_every_n_steps=5,
             callbacks=[GPUStatsMonitor() if torch.cuda.device_count() > 0 else None],
         )
     else:
-        trainer = pl.Trainer.from_argparse_args(args, profiler=profiler, logger=tb_logger, log_every_n_steps=5)
+        trainer = pl.Trainer.from_argparse_args(
+            args, max_epochs=args.epochs, profiler=profiler, logger=tb_logger, log_every_n_steps=5
+        )
 
     start_train(args, model, trainer)
 
@@ -326,6 +310,7 @@ def run_cli():
     parent_parser.add_argument("--batch-size", type=int, default=4)
     parent_parser.add_argument("--pin-memory", type=int, default=0)
     parent_parser.add_argument("--use-cache", type=int, default=0)
+    parent_parser.add_argument("--epochs", type=int, default=3)
 
     pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.advance = (
         training_epoch_loop.TrainingEpochLoop.advance
@@ -333,9 +318,9 @@ def run_cli():
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
     if torch.cuda.device_count() > 0:
-        parser.set_defaults(deterministic=True, max_epochs=10, gpus=[2])
+        parser.set_defaults(deterministic=True, gpus=[2])
     else:
-        parser.set_defaults(deterministic=True, max_epochs=3)
+        parser.set_defaults(deterministic=True)
     args = parser.parse_args()
     main(args)
 

@@ -10,10 +10,9 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Callable
 from typing import List
 
+from benchmarking.misc.time_helper import stopwatch
 from torch import Tensor
 from torch.utils.data import Dataset
-
-from benchmarking.misc.time_helper import stopwatch
 
 # \\
 

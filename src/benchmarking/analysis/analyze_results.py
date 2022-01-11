@@ -255,8 +255,13 @@ def plot_throughput_per_storage(df, group_by: List[str]):
             label=f"{storage} request_time",
             linestyle="dashed",
         )
-        # result.append({str(dataset): [df["throughput [Mbit/s]"], df2["median_request_time"]]})
-        result.append({"dataset": dataset, "throughput": df["throughput [Mbit/s]"], "median_request_time": df2["median_request_time"]})
+        result.append(
+            {
+                "dataset": dataset,
+                "throughput": df["throughput [Mbit/s]"],
+                "median_request_time": df2["median_request_time"],
+            }
+        )
 
     fig.legend(handlelength=5)
 

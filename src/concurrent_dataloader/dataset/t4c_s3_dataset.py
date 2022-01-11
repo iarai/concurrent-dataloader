@@ -12,10 +12,9 @@ from typing import Union
 import h5py
 import numpy as np
 import torch
-
 from benchmarking.misc.time_helper import stopwatch
-from faster_dataloader.dataset.s3_dataset import S3Dataset
-from faster_dataloader.dataset.s3_file import S3File
+from concurrent_dataloader.dataset.s3_dataset import S3Dataset
+from concurrent_dataloader.dataset.s3_file import S3File
 
 # source: https://github.com/iarai/NeurIPS2021-traffic4cast/blob/master/data/dataset/dataset.py
 
