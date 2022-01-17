@@ -16,7 +16,6 @@ import torch.optim
 import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
-
 from benchmarking.misc.init_benchmarking import get_dataset
 from torch.utils.data import DataLoader
 
@@ -212,12 +211,13 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
     cudnn.benchmark = True
 
     # Process creation method
-    torch.multiprocessing.set_start_method("fork") 
+    torch.multiprocessing.set_start_method("fork")
 
     # get the credentials and indexes
     base_folder = os.path.dirname(__file__)
-    s3_credential_file = os.path.join(base_folder, 
-                                      "../src/benchmarking/credentials_and_indexes/s3_iarai_playground_imagenet.json")
+    s3_credential_file = os.path.join(
+        base_folder, "../src/benchmarking/credentials_and_indexes/s3_iarai_playground_imagenet.json"
+    )
     val_dataset_index = f"../src/benchmarking/credentials_and_indexes/index-{args.dataset}-val.json"
     train_dataset_index = f"../src/benchmarking/credentials_and_indexes/index-{args.dataset}-train.json"
 

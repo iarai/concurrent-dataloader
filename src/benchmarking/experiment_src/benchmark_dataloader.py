@@ -1,24 +1,23 @@
 import argparse
 import logging
-import sys
 import os
-import torch
-
-from torch import Tensor
+import sys
 from functools import partial
 from pathlib import Path
 from typing import List
 from typing import Optional
 
+import torch
 from benchmarking.action_player.action_player import ActionPlayer
-from faster_dataloader.dataset.indexed_dataset import IndexedDataset
-from benchmarking.misc.init_benchmarking import init_benchmarking
 from benchmarking.misc.init_benchmarking import get_dataset
+from benchmarking.misc.init_benchmarking import init_benchmarking
 from benchmarking.misc.logging_configuration import initialize_logging
 from benchmarking.misc.time_helper import stopwatch
-from faster_dataloader.dataloader_mod.dataloader import DataLoader
-from faster_dataloader.async_dataloader.async_data_loader import AsynchronousLoader
-from faster_dataloader.dataloader_mod.worker import _worker_loop
+from concurrent_dataloader.async_dataloader.async_data_loader import AsynchronousLoader
+from concurrent_dataloader.dataloader_mod.dataloader import DataLoader
+from concurrent_dataloader.dataloader_mod.worker import _worker_loop
+from concurrent_dataloader.dataset.indexed_dataset import IndexedDataset
+from torch import Tensor
 
 
 @stopwatch(trace_name="(2)-load_all", trace_level=2)
@@ -41,19 +40,19 @@ def collate(batch: List) -> Tensor:
 
 @stopwatch(trace_name="(1)-benchmark", trace_level=1)
 def benchmark_dataloader(
-        dataset: IndexedDataset,
-        batch_size: int,
-        num_workers: int,
-        data_loader_type: str,
-        output_base_folder: Path,
-        repeat: int = 10,
-        prefetch_factor=2,
-        num_fetch_workers=4,
-        device: str = "cuda",
-        shuffle: bool = False,
-        num_batches: Optional[int] = None,
-        fetch_impl: Optional[str] = None,
-        batch_pool: Optional[int] = None,
+    dataset: IndexedDataset,
+    batch_size: int,
+    num_workers: int,
+    data_loader_type: str,
+    output_base_folder: Path,
+    repeat: int = 10,
+    prefetch_factor=2,
+    num_fetch_workers=4,
+    device: str = "cuda",
+    shuffle: bool = False,
+    num_batches: Optional[int] = None,
+    fetch_impl: Optional[str] = None,
+    batch_pool: Optional[int] = None,
 ) -> None:
     action_player = ActionPlayer()
 
@@ -105,8 +104,9 @@ def handle_arguments() -> argparse.ArgumentParser:
     parser.add_argument("--dataset", type=str, default="s3")
     parser.add_argument("--batch_size", type=int, default=16, help="Additional arguments")
     parser.add_argument("--num_workers", type=int, default=0, help="Additional arguments")
-    parser.add_argument("--data_loader_type", type=str,
-                        default="sync", help="sync/async, async is CUDA stream processing")
+    parser.add_argument(
+        "--data_loader_type", type=str, default="sync", help="sync/async, async is CUDA stream processing"
+    )
     parser.add_argument("--num_fetch_workers", type=int, default=4, help="Additional arguments")
     parser.add_argument("--prefetch_factor", type=int, default=2, help="Additional arguments")
     parser.add_argument("--repeat", type=int, default=1, help="Additional arguments")
@@ -141,15 +141,14 @@ def main(*args):
     s3_credential_file = os.path.join(base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json")
     train_dataset_index = f"../credentials_and_indexes/index-{dataset_source}-train.json"
 
-    # additional_args = args.args
-    args["dataset"] = get_dataset(dataset=dataset_source,
-                                  dataset_type="train",
-                                  use_cache=False,
-                                  index_file=Path(os.path.join(base_folder,
-                                                               train_dataset_index)),
-                                  classes_file=Path(os.path.join(base_folder,
-                                                                 "../credentials_and_indexes/imagenet-train-classes.json")),
-                                  s3_credential_file=s3_credential_file)
+    args["dataset"] = get_dataset(
+        dataset=dataset_source,
+        dataset_type="train",
+        use_cache=False,
+        index_file=Path(os.path.join(base_folder, train_dataset_index)),
+        classes_file=Path(os.path.join(base_folder, "../credentials_and_indexes/imagenet-train-classes.json")),
+        s3_credential_file=s3_credential_file,
+    )
 
     benchmark_dataloader(**args)
 

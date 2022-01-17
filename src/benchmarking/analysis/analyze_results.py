@@ -17,6 +17,7 @@ import seaborn as sns
 import tqdm
 from pandas import DataFrame
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
+from collections import defaultdict
 
 
 def plot_all(df: DataFrame, function_name: str, group_by: List[str], plot_max=True, log_scale=True, figsize=(50, 50)):
@@ -255,8 +256,13 @@ def plot_throughput_per_storage(df, group_by: List[str]):
             label=f"{storage} request_time",
             linestyle="dashed",
         )
-        # result.append({str(dataset): [df["throughput [Mbit/s]"], df2["median_request_time"]]})
-        result.append({"dataset": dataset, "throughput": df["throughput [Mbit/s]"], "median_request_time": df2["median_request_time"]})
+        result.append(
+            {
+                "dataset": dataset,
+                "throughput": df["throughput [Mbit/s]"],
+                "median_request_time": df2["median_request_time"],
+            }
+        )
 
     fig.legend(handlelength=5)
 
@@ -610,7 +616,7 @@ def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_g
 
     if show_gpu:
         ax2 = ax.twinx()
-        ax2.set_ylabel("GPU/Memory utilization (green, maroon)")
+        ax2.set_ylabel("GPU/Memory utilization (green, maroon) [%]")
 
         r"{\fontsize{50pt}{3em}\selectfont{}a}{\fontsize{20pt}{3em}\selectfont{}N"
         ax2.set_ylim([-3, 103])
@@ -630,10 +636,11 @@ def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_g
             gpu_events, [mem_util_mean_no_zeros] * len(gpu_events), label="Mem Util Mean", linewidth=2, color="maroon"
         )
         print(gpu_util_mean_no_zeros, mem_util_mean_no_zeros)
+        ax2.legend()
 
     ax.set_title(
         f"Total runtime per operation \n Implementation: {filename[9]},"
-        f" use cache: {filename[8]}, "
+        # f" use cache: {filename[8]}, "
         f" batch size: {filename[5]}, "
         f" library: {filename[3]}, "
         f"\n GPU unused: {round(gpu_util_zeros, 2)} %, "
