@@ -1,23 +1,23 @@
 import argparse
 import logging
-import sys
 import os
+import sys
 from pathlib import Path
 
 from benchmarking.action_player.action_player import ActionPlayer
 from benchmarking.action_player.mp_action_player import MPActionPlayer
-from faster_dataloader.dataset.indexed_dataset import IndexedDataset
-from benchmarking.misc.init_benchmarking import init_benchmarking
 from benchmarking.misc.init_benchmarking import get_dataset
+from benchmarking.misc.init_benchmarking import init_benchmarking
+from concurrent_dataloader.dataset.indexed_dataset import IndexedDataset
 
 
 def benchmark_dataset(
-        dataset: IndexedDataset,
-        output_base_folder: Path,
-        pool_size: int = 5,
-        num_index_all=0,
-        num_load_index=1,
-        num_get_random_item=10000,
+    dataset: IndexedDataset,
+    output_base_folder: Path,
+    pool_size: int = 5,
+    num_index_all=0,
+    num_load_index=1,
+    num_get_random_item=10000,
 ) -> None:
     if pool_size == 0:
         action_player = ActionPlayer()
@@ -108,21 +108,22 @@ def main(*args):
     s3_credential_file = os.path.join(base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json")
     train_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-train.json"
 
-    # additional_args = args.args
-    dataset = get_dataset(dataset=dataset,
-                          dataset_type="train",
-                          use_cache=False,
-                          index_file=Path(os.path.join(base_folder,
-                                                       train_dataset_index)),
-                          classes_file=Path(os.path.join(base_folder,
-                                                         "../credentials_and_indexes/imagenet-train-classes.json")),
-                          s3_credential_file=s3_credential_file)
+    dataset = get_dataset(
+        dataset=dataset,
+        dataset_type="train",
+        use_cache=False,
+        index_file=Path(os.path.join(base_folder, train_dataset_index)),
+        classes_file=Path(os.path.join(base_folder, "../credentials_and_indexes/imagenet-train-classes.json")),
+        s3_credential_file=s3_credential_file,
+    )
 
     if dataset is None:
         parser.print_help()
         exit(2)
 
-    benchmark_dataset(dataset=dataset, **benchmark_args,)
+    benchmark_dataset(
+        dataset=dataset, **benchmark_args,
+    )
 
 
 if __name__ == "__main__":

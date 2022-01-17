@@ -3,17 +3,22 @@ import os
 from pathlib import Path
 from typing import Optional
 
+from benchmarking.misc.random_generator import RandomGenerator
+from benchmarking.misc.time_helper import stopwatch
+from concurrent_dataloader.dataset.indexed_dataset import IndexedDataset
 from overrides import overrides
 from PIL import Image
 from torchvision import transforms
 
-from benchmarking.misc.random_generator import RandomGenerator
-from benchmarking.misc.time_helper import stopwatch
-from faster_dataloader.dataset.indexed_dataset import IndexedDataset
-
 
 class ScratchDataset(IndexedDataset):
-    def __init__(self, index_file: Path, classes_file: Optional[Path] = None, limit: int = None, local_path: Optional[Path] = None) -> None:
+    def __init__(
+        self,
+        index_file: Path,
+        classes_file: Optional[Path] = None,
+        limit: int = None,
+        local_path: Optional[Path] = None,
+    ) -> None:
         self.limit = limit
         self.classes_file = classes_file
         self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
@@ -62,7 +67,7 @@ class ScratchDataset(IndexedDataset):
                 )
         else:
             target = None
-        
+
         image_path = self.image_paths[index]
         if self.local_path is not None:
             image_path = self.local_path + "/" + self.image_paths[index]

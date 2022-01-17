@@ -7,11 +7,10 @@ from typing import Optional
 from typing import Union
 
 import torch
+from concurrent_dataloader.dataloader_mod.dataloader import DataLoader
 from torch import Tensor
 from torch._six import string_classes
 from torch.utils.data import Dataset
-from faster_dataloader.dataloader_mod.dataloader import DataLoader
-
 
 
 class AsynchronousLoader(object):

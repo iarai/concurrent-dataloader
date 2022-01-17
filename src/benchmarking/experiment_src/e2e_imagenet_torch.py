@@ -17,15 +17,14 @@ import torch.optim
 import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
-
 from benchmarking.misc.gpulogger import GPUSidecarLogger
 from benchmarking.misc.init_benchmarking import get_dataset
 from benchmarking.misc.init_benchmarking import init_benchmarking
 from benchmarking.misc.logging_configuration import initialize_logging
-from faster_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
-from faster_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
-from faster_dataloader.dataloader_vanilla.dataloader import DataLoader as DataLoaderVanilla
-from faster_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
+from concurrent_dataloader.dataloader_mod.dataloader import DataLoader as DataLoaderParallel
+from concurrent_dataloader.dataloader_mod.worker import _worker_loop as _worker_loop_parallel
+from concurrent_dataloader.dataloader_vanilla.dataloader import DataLoader as DataLoaderVanilla
+from concurrent_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
 
 model_names = sorted(
     name for name in models.__dict__ if name.islower() and not name.startswith("__") and callable(models.__dict__[name])
@@ -220,12 +219,9 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
 
     # get the credentials and indexes
     base_folder = os.path.dirname(__file__)
-    s3_credential_file = os.path.join(
-        base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json"
-    )
+    s3_credential_file = os.path.join(base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json")
     val_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-val.json"
     train_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-train.json"
-
 
     # create datasets
     val_dataset = get_dataset(
@@ -234,9 +230,7 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
         limit=args.dataset_limit,
         use_cache=args.use_cache,
         index_file=Path(os.path.join(base_folder, val_dataset_index)),
-        classes_file=Path(
-            os.path.join(base_folder, "../credentials_and_indexes/imagenet-val-classes.json")
-        ),
+        classes_file=Path(os.path.join(base_folder, "../credentials_and_indexes/imagenet-val-classes.json")),
         s3_credential_file=s3_credential_file,
     )
 
@@ -246,9 +240,7 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
         limit=args.dataset_limit,
         use_cache=args.use_cache,
         index_file=Path(os.path.join(base_folder, train_dataset_index)),
-        classes_file=Path(
-            os.path.join(base_folder, "../credentials_and_indexes/imagenet-train-classes.json")
-        ),
+        classes_file=Path(os.path.join(base_folder, "../credentials_and_indexes/imagenet-train-classes.json")),
         s3_credential_file=s3_credential_file,
     )
 
@@ -265,7 +257,6 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
     val_dataset.set_transform(transform)
     train_dataset.set_transform(transform)
 
-    
     if args.fetch_impl == "vanilla":
         train_loader = DataLoaderVanilla(
             dataset=train_dataset,

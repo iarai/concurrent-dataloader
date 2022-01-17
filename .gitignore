@@ -146,10 +146,10 @@ cython_debug/
 
 output
 output_s3
-src/faster_dataloader/benchmark_output/
+src/concurrent_dataloader/benchmark_output/
 .idea
-src/faster_dataloader/lightning_logs/
+src/concurrent_dataloader/lightning_logs/
 .tar
 .tar.gz
-src/faster_dataloader/benchmark_output.tar.gz
+src/concurrent_dataloader/benchmark_output.tar.gz
 benchmark_output/*

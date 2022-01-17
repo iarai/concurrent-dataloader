@@ -22,6 +22,7 @@ from typing import Optional
 from typing import Union
 
 import torch
+from benchmarking.misc.time_helper import stopwatch
 from pytorch_lightning import loops  # import as loops to avoid circular imports
 from pytorch_lightning.loops.batch import TrainingBatchLoop
 from pytorch_lightning.trainer.connectors.logger_connector.result import ResultCollection
@@ -32,8 +33,6 @@ from pytorch_lightning.utilities.model_helpers import is_overridden
 from pytorch_lightning.utilities.signature_utils import is_param_in_hook_signature
 from pytorch_lightning.utilities.types import STEP_OUTPUT
 from pytorch_lightning.utilities.warnings import WarningCache
-
-from benchmarking.misc.time_helper import stopwatch
 
 
 class TrainingEpochLoop(loops.Loop):
