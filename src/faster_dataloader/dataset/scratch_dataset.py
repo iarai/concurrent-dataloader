@@ -43,7 +43,9 @@ class ScratchDataset(IndexedDataset):
     # TODO we should make this code independent of the underlying dataset, not necessarily images/imagenet?
     @stopwatch(trace_name="(5)-get_item", trace_level=5, strip_result=True)
     def __getitem__(self, index) -> Image:
-        class_folder_name = self.image_paths[index].split("/")[4]
+        # class_folder_name = self.image_paths[index].split("/")[4]
+        # print("PATHS: ",  self.image_paths[index].split("/"))
+        class_folder_name = self.image_paths[index].split("/")[2]
 
         if self.classes is not None:
             # validation dataset
@@ -62,6 +64,8 @@ class ScratchDataset(IndexedDataset):
             target = None
         
         image_path = self.image_paths[index]
+        if self.local_path is not None:
+            image_path = self.local_path + "/" + self.image_paths[index]
         image = Image.open(image_path)
 
         # some images in the scratch dataset seem to be in "L" instead of "RGB" mode
