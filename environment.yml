@@ -27,4 +27,5 @@ dependencies:
       - pyarrow==5.0.0
       - seaborn==0.11.2
       - scipy==1.7.3
-      - pytorch_lightning==1.4.7
+      # originally, experiments were performed with 1.4.7
+      - pytorch_lightning==1.5.9

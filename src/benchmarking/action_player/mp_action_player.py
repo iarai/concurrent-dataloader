@@ -20,15 +20,11 @@ class MPActionPlayer(ActionPlayer):
         logging.debug("Initializing Multiprocessing ActionPlayer")
         self.pool_size = pool_size
 
-    def run(self, action_name: str, action: Callable, repeat_action: int = 20):
-        logging.info(f"Repeating {action_name} {repeat_action} times!")
-        for _ in range(repeat_action):
-            action()
-        logging.info(f"Done {action_name} {repeat_action} times!")
+    def run(self, action_name: str, action: Callable):
+        action()
 
     def benchmark(self, action_name: str, action: Callable, repeat: int, output_base_folder: Path,) -> None:
         # each worker is assigned a number of repetitions (so in total still "repeat" number of actions)
-
         with Pool(
             self.pool_size,
             initializer=partial(
@@ -37,4 +33,4 @@ class MPActionPlayer(ActionPlayer):
                 output_base_folder=output_base_folder,
             ),
         ) as pool:
-            pool.starmap(self.run, [(action_name, action, repeat // self.pool_size)] * self.pool_size)
+            pool.starmap(self.run, [(action_name, action)] * self.pool_size)

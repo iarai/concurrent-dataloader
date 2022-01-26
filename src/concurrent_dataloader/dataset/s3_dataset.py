@@ -128,6 +128,7 @@ class S3Dataset(IndexedDataset):
             elif class_folder_name.startswith("n"):
                 target = self.classes[class_folder_name]["id"]
             else:
+                print(self.image_paths[index].split("/"))
                 raise ValueError(
                     "Unexpected file name. Training image names should start with 'n', while"
                     "validation image paths should start with 'ILSV'."
