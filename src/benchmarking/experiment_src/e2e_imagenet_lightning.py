@@ -174,9 +174,18 @@ class ImageNetLightningModel(LightningModule):
 def main(args: Namespace) -> None:
     # get the credentials and indexes
     base_folder = os.path.dirname(__file__)
-    s3_credential_file = os.path.join(base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json")
+    
+    credentials_file = "../credentials_and_indexes/s3_iarai_playground_imagenet.json"
+    ds = args.dataset
+    if args.dataset == "ceph-os":
+        credentials_file = "../credentials_and_indexes/ceph_iarai_playground_imagenet.json"
+        ds = "ceph"
 
-    train_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-train.json"
+
+    # get the credentials and indexes
+    base_folder = os.path.dirname(__file__)
+    s3_credential_file = os.path.join(base_folder, credentials_file)
+    train_dataset_index = f"../credentials_and_indexes/index-{ds}-train.json"
 
     train_dataset = get_dataset(
         args.dataset,
@@ -186,6 +195,7 @@ def main(args: Namespace) -> None:
         index_file=Path(os.path.join(base_folder, train_dataset_index)),
         classes_file=Path(os.path.join(base_folder, "../credentials_and_indexes/imagenet-train-classes.json")),
         s3_credential_file=s3_credential_file,
+        flavor=args.dataset
     )
 
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -257,6 +267,7 @@ def main(args: Namespace) -> None:
 
     tb_logger = pl_loggers.TensorBoardLogger(f"{output_base_folder}/lightning/")
     profiler = SimpleProfiler(output_filename=f"{output_base_folder}/lightning/{time.time()}.txt")
+    print(f"Max epochs: {args.epochs}")
     if torch.cuda.device_count() > 0:
         trainer = pl.Trainer.from_argparse_args(
             args,

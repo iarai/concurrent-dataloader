@@ -38,6 +38,7 @@ class S3Dataset(IndexedDataset):
         aws_access_key_id: Optional[str] = None,
         aws_secret_access_key: Optional[str] = None,
         endpoint_url: Optional[str] = None,
+        flavor: Optional[str] = None,
         use_cache: bool = False,
         **kwargs,
     ) -> None:
@@ -64,6 +65,7 @@ class S3Dataset(IndexedDataset):
         self.index_file = index_file
         self.classes_file = classes_file
         self.limit = limit
+        self.flavor = flavor
         self.transform = transforms.Compose([transforms.Grayscale(num_output_channels=1), transforms.ToTensor(),])
         self.bucket_name = bucket_name
         self.rng = None
@@ -113,7 +115,10 @@ class S3Dataset(IndexedDataset):
             https://github.com/pytorch/vision/blob/7947fc8fb38b1d3a2aca03f22a2e6a3caa63f2a0/torchvision/datasets/folder.py#L229
                 - target is class_index of the target class
         """
-        class_folder_name = self.image_paths[index].split("/")[3]
+        if self.flavor == "ceph-os":
+            class_folder_name = self.image_paths[index].split("/")[1]
+        else:
+            class_folder_name = self.image_paths[index].split("/")[3]
         if self.classes is not None:
             # validation dataset
             if class_folder_name.startswith("ILSV"):

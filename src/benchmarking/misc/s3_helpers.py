@@ -4,7 +4,6 @@ from typing import Optional
 from typing import Union
 from urllib.parse import urlparse
 
-
 # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/credentials.html
 
 
@@ -17,6 +16,7 @@ def get_s3_bucket(
     max_retries: int = 100,
     use_cache: bool = False,
 ):
+
     boto3_module = importlib.import_module("boto3")
     botocore_module = importlib.import_module("botocore")
     # https://github.com/boto/boto3/issues/801#issuecomment-358195444
@@ -41,7 +41,7 @@ def get_s3_bucket(
                         max_pool_connections=max_pool_connections, signature_version=botocore_module.UNSIGNED
                     ),
                 )
-        except BaseException:
+        except Exception as ex:
             s3_client = None
 
     if retries >= 100:

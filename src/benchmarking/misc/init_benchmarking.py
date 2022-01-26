@@ -2,17 +2,12 @@ import json
 import platform
 from argparse import Namespace
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 from typing import Optional
 
 from benchmarking.misc.logging_configuration import initialize_logging
 from concurrent_dataloader.dataset.s3_dataset import S3Dataset
 from concurrent_dataloader.dataset.scratch_dataset import ScratchDataset
-from concurrent_dataloader.dataset.t4c_s3_dataset import HDF5S3MODE
-from concurrent_dataloader.dataset.t4c_s3_dataset import T4CDataset
-
-# if installed:
 
 
 def init_benchmarking(args: Namespace, action: str, loglevel: str = "INFO"):
@@ -52,22 +47,18 @@ def get_dataset(
     additional_args: Optional[Any] = None,
     limit: Optional[int] = None,
     s3_credential_file: Optional[str] = None,
+    flavor: Optional[str] = None,
 ):
-    if dataset == "t4c":
-        # TODO magic constants... extract to cli... how to do in a generic way...
-        dataset = T4CDataset(
-            **json.load(open("s3_iarai_playground_t4c21.json")),
-            index_file=Path(f"index-t4c-{dataset_type}.json"),
-            limit=limit,
-            mode=HDF5S3MODE[additional_args],
-        )
-    elif dataset == "s3":
+    if dataset == "s3" or dataset == "ceph-os":
         if use_cache == 1:
             use_cache = True
-            endpoint = "http://localhost:6081"
+            endpoint = "http://localhost:6081" # for CEPH Object Store this needs to be changed to different address 
         else:
             use_cache = False
-            endpoint = "http://s3.amazonaws.com"
+            if dataset == "ceph-os":
+                endpoint = "http://10.0.2.1:80"
+            else:
+                endpoint = "http://s3.amazonaws.com"
         dataset = S3Dataset(
             # TODO magic constants... extract to cli... how to do in a generic way...
             **parse_args_file(s3_credential_file, dataset_type),
@@ -76,10 +67,11 @@ def get_dataset(
             limit=limit,
             endpoint_url=endpoint,
             use_cache=use_cache,
+            flavor=flavor
         )
     elif dataset == "scratch":
         dataset = ScratchDataset(index_file=index_file, classes_file=classes_file, limit=limit,)
-    elif dataset == "glusterfs":
+    elif dataset == "glusterfs": # also works for ceph 
         dataset = ScratchDataset(
             index_file=index_file, classes_file=classes_file, limit=limit, local_path="/iarai/home/ivan.svogor/temp"
         )

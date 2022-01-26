@@ -7,6 +7,7 @@ for i in {1..10}; do
             --num-workers 4 \
             --batch-pool 512 \
             --dataset-limit 35000 \
+            --epochs 100 \
             --batch-size 256 \
             --prefetch-factor 2 \
             --fetch-impl "${fetch_impl}" \

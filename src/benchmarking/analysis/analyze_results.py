@@ -700,7 +700,7 @@ def plot_histogram(throughput, title):
     ax.plot()
 
 
-def plot_all_histograms(res, impls, libs, display=True):
+def plot_all_histograms(res, impls, libs, display=True, value="throughput"):
     df_throughput_all = pd.DataFrame()
     for impl in impls:
         for lib in libs:
@@ -708,15 +708,15 @@ def plot_all_histograms(res, impls, libs, display=True):
             key = f"{impl}_{lib}"
             for experiment in range(len(res)):
                 data = res[experiment].round(2)
-                data = data[(data["library"] == lib) & (data["implementation"] == impl)]["throughput"]
+                data = data[(data["library"] == lib) & (data["implementation"] == impl)][value]
                 throughput.append(data)
             df_throughput_all[key] = pd.DataFrame.from_records(throughput)
             if display:
-                plot_histogram(throughput, f"Setup: {impl}, {lib}")
+                plot_histogram(throughput, f"Setup: {impl}, {lib}") 
     return df_throughput_all
 
 
-def plot_violins(throughput, title):
+def plot_violins(throughput, title, y_title = None):
     fig, ax = plt.subplots(figsize=(10, 10))
     plt.rcParams.update({"font.size": 12})
     all_data = []
@@ -735,7 +735,10 @@ def plot_violins(throughput, title):
     ax.set_xticklabels(labels=labels, rotation=20)
     ax.set_xlim(0.25, len(labels) + 0.75)
     ax.set_xlabel("Experiment setup")
-    ax.set_ylabel("Throughput (imgs/s)")
+    if y_title is None:
+        ax.set_ylabel("Throughput (imgs/s)")
+    else:
+        ax.set_ylabel(y_title)
     ax.set_title(title)
     ax.grid(linestyle="--", which="both")
     plt.plot()

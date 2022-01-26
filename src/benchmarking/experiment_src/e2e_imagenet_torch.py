@@ -217,22 +217,18 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
 
     cudnn.benchmark = True
 
+    # default
+    credentials_file = "../credentials_and_indexes/s3_iarai_playground_imagenet.json"
+    ds = args.dataset
+    if args.dataset == "ceph-os":
+        credentials_file = "../credentials_and_indexes/ceph_iarai_playground_imagenet.json"
+        ds = "ceph"
+
+
     # get the credentials and indexes
     base_folder = os.path.dirname(__file__)
-    s3_credential_file = os.path.join(base_folder, "../credentials_and_indexes/s3_iarai_playground_imagenet.json")
-    val_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-val.json"
-    train_dataset_index = f"../credentials_and_indexes/index-{args.dataset}-train.json"
-
-    # create datasets
-    val_dataset = get_dataset(
-        args.dataset,
-        dataset_type="val",
-        limit=args.dataset_limit,
-        use_cache=args.use_cache,
-        index_file=Path(os.path.join(base_folder, val_dataset_index)),
-        classes_file=Path(os.path.join(base_folder, "../credentials_and_indexes/imagenet-val-classes.json")),
-        s3_credential_file=s3_credential_file,
-    )
+    s3_credential_file = os.path.join(base_folder, credentials_file)
+    train_dataset_index = f"../credentials_and_indexes/index-{ds}-train.json"
 
     train_dataset = get_dataset(
         args.dataset,
@@ -242,6 +238,7 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
         index_file=Path(os.path.join(base_folder, train_dataset_index)),
         classes_file=Path(os.path.join(base_folder, "../credentials_and_indexes/imagenet-train-classes.json")),
         s3_credential_file=s3_credential_file,
+        flavor=args.dataset
     )
 
     if args.distributed:
@@ -254,7 +251,7 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
         [transforms.Resize(256), transforms.CenterCrop(224), transforms.ToTensor(), normalize]
     )
 
-    val_dataset.set_transform(transform)
+    # val_dataset.set_transform(transform)
     train_dataset.set_transform(transform)
 
     if args.fetch_impl == "vanilla":
