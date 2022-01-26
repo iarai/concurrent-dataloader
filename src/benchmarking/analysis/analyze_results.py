@@ -564,7 +564,7 @@ def show_timelines(df, run, lanes, colors, flat=False, zoom=False, zoom_epochs=1
     plt.show()
 
 
-def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_gpu=False, zoom=False, zoom_epochs=1):
+def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_gpu=False, zoom=False, zoom_epochs=1, gpu_index="2"):
     fig, ax = plt.subplots(figsize=(30, 25))
     plt.rcParams.update({"font.size": 18})
     start = min(df["start_time_x"])
@@ -623,12 +623,12 @@ def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_g
         gpu_events = []
         for i in gpu_util["timestamp"]:
             gpu_events.append(i - start)
-        ax2.plot(gpu_events, gpu_util["gpu_util_2"], color="cyan", linestyle="--", linewidth=2)
-        ax2.plot(gpu_events, gpu_util["mem_util_2"], color="maroon", linestyle="--", linewidth=2)
-        gpu_util_zeros = (len(gpu_util[gpu_util["gpu_util_2"] == 0]["gpu_util_2"]) / len(gpu_util["gpu_util_2"])) * 100
-        gpu_util_mean_no_zeros = np.mean(gpu_util[gpu_util["gpu_util_2"] > 0]["gpu_util_2"])
-        mem_util_mean = np.mean(gpu_util["mem_util_2"])
-        mem_util_mean_no_zeros = np.mean(gpu_util[gpu_util["mem_util_2"] > 0]["mem_util_2"])
+        ax2.plot(gpu_events, gpu_util[f"gpu_util_{gpu_index}"], color="cyan", linestyle="--", linewidth=2)
+        ax2.plot(gpu_events, gpu_util[f"mem_util_{gpu_index}"], color="maroon", linestyle="--", linewidth=2)
+        gpu_util_zeros = (len(gpu_util[gpu_util[f"gpu_util_{gpu_index}"] == 0][f"gpu_util_{gpu_index}"]) / len(gpu_util[f"gpu_util_{gpu_index}"])) * 100
+        gpu_util_mean_no_zeros = np.mean(gpu_util[gpu_util[f"gpu_util_{gpu_index}"] > 0][f"gpu_util_{gpu_index}"])
+        mem_util_mean = np.mean(gpu_util[f"mem_util_{gpu_index}"])
+        mem_util_mean_no_zeros = np.mean(gpu_util[gpu_util[f"mem_util_{gpu_index}"] > 0][f"mem_util_{gpu_index}"])
         ax2.plot(
             gpu_events, [gpu_util_mean_no_zeros] * len(gpu_events), label="GPU Util Mean", linewidth=2, color="cyan"
         )

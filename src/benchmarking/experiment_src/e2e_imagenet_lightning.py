@@ -256,7 +256,8 @@ def main(args: Namespace) -> None:
         gpu_logger.start()
 
     tb_logger = pl_loggers.TensorBoardLogger(f"{output_base_folder}/lightning/")
-    profiler = SimpleProfiler(output_filename=f"{output_base_folder}/lightning/{time.time()}.txt")
+    # profiler = SimpleProfiler(filename=f"{output_base_folder}/lightning/{time.time()}.txt")
+    profiler = SimpleProfiler(dirpath=f"{output_base_folder}/lightning/", filename=f"{str(time.time())}")
     if torch.cuda.device_count() > 0:
         trainer = pl.Trainer.from_argparse_args(
             args,
@@ -310,7 +311,7 @@ def run_cli():
     parent_parser.add_argument("--batch-size", type=int, default=4)
     parent_parser.add_argument("--pin-memory", type=int, default=0)
     parent_parser.add_argument("--use-cache", type=int, default=0)
-    parent_parser.add_argument("--epochs", type=int, default=3)
+    parent_parser.add_argument("--epochs", type=int, default=100)
 
     pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.advance = (
         training_epoch_loop.TrainingEpochLoop.advance

@@ -48,9 +48,9 @@ class ScratchDataset(IndexedDataset):
     # TODO we should make this code independent of the underlying dataset, not necessarily images/imagenet?
     @stopwatch(trace_name="(5)-get_item", trace_level=5, strip_result=True)
     def __getitem__(self, index) -> Image:
-        # class_folder_name = self.image_paths[index].split("/")[4]
+        class_folder_name = self.image_paths[index].split("/")[4]
         # print("PATHS: ",  self.image_paths[index].split("/"))
-        class_folder_name = self.image_paths[index].split("/")[2]
+        # class_folder_name = self.image_paths[index].split("/")[2]
 
         if self.classes is not None:
             # validation dataset
@@ -61,6 +61,7 @@ class ScratchDataset(IndexedDataset):
             elif class_folder_name.startswith("n"):
                 target = self.classes[class_folder_name]["id"]
             else:
+                print("PATHS: ",  self.image_paths[index].split("/"))
                 raise ValueError(
                     "Unexpected file name. Training image names should start with 'n', while"
                     " validation image paths should start with 'ILSV'."
