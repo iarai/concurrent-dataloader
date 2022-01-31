@@ -265,13 +265,103 @@ def plot_throughput_per_storage(df, group_by: List[str]):
         )
 
     fig.legend(handlelength=5)
-
+ 
     ax1.set_ylabel("throughput [Mbit/s]")
     ax1.set_xlabel(f"{x_label} [#processes]")
     ax1.set_title(f"Storage benchmarking {nodes} {list(collected.keys())}")
     ax2.set_ylabel("Request time [s]")
     return result
 
+
+def plot_throughput_per_storage2(df, group_by: List[str]):
+    collected = {}
+
+    x_label = group_by[1]
+
+    df_for_function_name = df[df["function_name"] == "__getitem__"]
+    request_time = df_for_function_name["time_end"] - df_for_function_name["time_start"]
+    df_for_function_name["request_time"] = request_time
+    
+    nodes = set(df_for_function_name["node"].drop_duplicates().tolist())
+    df_grouped_by_run = df_for_function_name.groupby(["run"]).agg(
+        {"time_start": "min", "time_end": "max", "len": "sum", **{k: "first" for k in group_by}}
+    )
+    runtime = df_grouped_by_run["time_end"] - df_grouped_by_run["time_start"]
+    df_grouped_by_run["runtime"] = runtime
+    throughput = df_grouped_by_run["len"] / df_grouped_by_run["runtime"] / 10 ** 6 * 8
+    df_grouped_by_run["throughput [Mbit/s]"] = throughput
+
+    # sum of all runtimes and all downloaded data by summer over runs
+    df_aggregated_over_runs = df_grouped_by_run.groupby(group_by).agg(
+        **{
+            "len": ("len", "sum"),
+            "runtime": ("runtime", "sum"),
+            "min_throughput": ("throughput [Mbit/s]", "min"),
+            "max_throughput": ("throughput [Mbit/s]", "max"),
+            **{k: (k, "first") for k in group_by},
+        }
+    )
+
+    # https://en.wikipedia.org/wiki/Data-rate_units#Megabit_per_second
+    df_aggregated_over_runs["throughput [Mbit/s]"] = (
+        df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / 10 ** 6 * 8
+    )
+    df_aggregated_over_runs["min_throughput"] = df_aggregated_over_runs["min_throughput"]
+
+    # all requests from all data
+    df_aggregated_over_requests = df_for_function_name.groupby(group_by).agg(
+        **{
+            "min_request_time": ("request_time", "min"),
+            "max_request_time": ("request_time", "max"),
+            "median_request_time": ("request_time", "median"),
+            "mean_request_time": ("request_time", "mean"),
+            **{k: (k, "first") for k in group_by},
+        }
+    )
+
+    fig, ax1 = plt.subplots(figsize=(50, 10))
+    ax1.set_ylim([0, max(200, df_grouped_by_run["throughput [Mbit/s]"].max())])
+    ax2 = ax1.twinx()
+    cmap = plt.cm.get_cmap("Set1")
+
+    result = []
+    # TODO loop over groups instead
+    for i, dataset in enumerate(["s3", "scratch"]):
+        df = df_aggregated_over_runs[df_aggregated_over_runs["dataset"] == dataset]
+
+        storage = dataset
+
+        ax1.plot(
+            df[x_label],
+            df["throughput [Mbit/s]"],
+            linewidth=4,
+            color=cmap(i),
+            label=f"{storage} throughput over all runs, min/max hull per run",
+        )
+        ax1.fill_between(
+            df[x_label], df["min_throughput"], df["max_throughput"], color=lighten_color(cmap(i), 0.2), alpha=0.5
+        )
+        ax1.set_xticks(df[x_label])
+
+        df2 = df_aggregated_over_requests[df_aggregated_over_requests["dataset"] == dataset]
+        ax2.plot(
+            df2[x_label],
+            df2["median_request_time"],
+            linewidth=4,
+            color=cmap(i),
+            label=f"{storage} request_time",
+            linestyle="dashed",
+        )
+        # result.append({str(dataset): [df["throughput [Mbit/s]"], df2["median_request_time"]]})
+        result.append({"dataset": dataset, "throughput": df["throughput [Mbit/s]"], "median_request_time": df2["median_request_time"]})
+
+    fig.legend(handlelength=5)
+
+    ax1.set_ylabel("throughput [Mbit/s]")
+    ax1.set_xlabel(f"{x_label} [#processes]")
+    ax1.set_title(f"Storage benchmarking {nodes} {list(collected.keys())}")
+    ax2.set_ylabel("Request time [s]")
+    return result 
 
 def plot_events_timeline(
     df_dataloader, color_column: str = "threading_ident", cycle=11, summary_only=False, verbose=True,
