@@ -16,7 +16,7 @@ Having said that, we will focus on those two frameworks, [Torch](https://github.
 
 To provide a more comprehensive, and hands-on example of what we are dealing with here, we worked out a simple, and quick benchmark to provide some data. 
 
-##Quick test
+## Quick test
 
 Let’s consider an unmodified implementation, which from here onwards we will refer to as vanilla implementation, of the aforementioned ResNet-18, implemented via Torch and Lightning. We used a single Nvidia Tesla V100 (SXM2-32GB), and already mentioned ResNet-18 implementations, out of the box, come with the following parameters: 
 - Batch size: 256
@@ -91,8 +91,7 @@ With this, one could conclude that the majority of the total training time is co
 | 3   | 68.44 | 40.86 | Local  | 31.26 | Torch     | 540.47   | 27.75 | 
 | 4   | 61.13 | 22.66 | Local  | 70.20 | Lightning | 1968.22  | 7.62  |
 
-
-Source and data: src/benchmarking/experiments/motivation/InitialRun.ipynb
+Source and data: [src/benchmarking/experiments/motivation/InitialRun.ipynb](src/benchmarking/experiments/motivation/InitialRun.ipynb)
 
 It is no surprise that using the local data considerably decreases the runtime, however, it is also interesting to note that the performance of implementation in Torch and Lightning differs significantly, and even more interesting that more than 94% of the time the GPU is idle, when using the remote storage. 
 
@@ -100,10 +99,10 @@ As mentioned before, we know that each data item is accessed sequentially, regar
 
 Furthermore, would that implementation also increase the performance of the model using the local storage and GPU idling as much as possible? 
 
-Conclusion
+## Conclusion
  
-What did we learn:
-Torch and lightning performance
-Parallelism 
-Remote storage vs local storage 
-Idling 
+In this section we extended the current Torch and Lightning libraries with additional logging that can provide us with a detailed picture of GPU utilization, GPU memory utilization, function calls during the training and data fetching, as well as their runtime. With this, several curious implementation issues were highlighted, that we will address in the subsequent sections. Focusing on the experiment runtime and loaded images per second, these are:
+
+- While Lightning is a wrapper for Torch, its performance is significantly poorer than that of Torch. 
+- The GPU seems to be idle (in some cases up to 98\% of time), for the most part of the experiment. Not only for using remote storage, but local as well. 
+- Using remote storage and local storage also makes a great difference in performance. 

@@ -127,3 +127,11 @@ export PYTHONPATH=$PWD
 jupyter notebook analysis/Analysis.ipynb
 
 ```
+
+## Citation
+
+Cite as:
+
+```commandline
+bib... 
+```
