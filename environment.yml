@@ -25,4 +25,7 @@ dependencies:
       - humanize==3.11.0
       - ray==1.6.0
       - pyarrow==5.0.0
-      - pytorch_lightning==1.4.7
+      - seaborn==0.11.2
+      - scipy==1.7.3
+      # originally, experiments were performed with 1.4.7
+      - pytorch_lightning==1.5.9
