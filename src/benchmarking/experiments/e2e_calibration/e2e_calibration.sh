@@ -2,7 +2,7 @@
 # set max epochs to 100, 15000
 set -e
 set -x
-for epochs in 5000 10000 20000; do
+for epochs in 5 10 20; do
   for fetch_impl in "threaded" "asyncio" ; do
     for implementation in "../../experiment_src/e2e_imagenet_torch.py" "../../experiment_src/e2e_imagenet_lightning.py" ; do
         python3 "${implementation}" --output_base_folder "../../../../benchmark_output/e2e_calibration/" \
