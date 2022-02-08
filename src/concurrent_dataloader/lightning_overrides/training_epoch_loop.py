@@ -219,9 +219,26 @@ class TrainingEpochLoop(loops.Loop[_OUTPUTS_TYPE]):
 
             self.batch_progress.increment_started()
 
+            # //
+            run_training_timeline_id = abs(hash(frozenset(batch))) + time.time()
+            logging.getLogger("timeline").debug(json.dumps({
+                "item": "run_training_batch",
+                "id": run_training_timeline_id,
+                "start_time": time.time()
+            }))
+            # \\
+
             with self.trainer.profiler.profile("run_training_batch"):
                 batch_output = self.batch_loop.run(batch, batch_idx)
 
+            # //
+            logging.getLogger("timeline").debug(json.dumps({
+                        "item": "run_training_batch",
+                        "id": run_training_timeline_id,
+                        "end_time": time.time()
+                    }))
+            # \\
+            
         self.batch_progress.increment_processed()
 
         # update non-plateau LR schedulers
