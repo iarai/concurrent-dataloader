@@ -62,7 +62,6 @@ class GPUSidecarLoggerMs:
 
     def stop(self):
         if self.sp is not None:
-            # self.sp.send_signal(signal.SIGKILL)
             os.killpg(os.getpgid(self.sp.pid), signal.SIGTERM)
             with open(self.out_file.name, "r") as f:
                 gpu_usage = {}
