@@ -256,6 +256,7 @@ class DataLoader(Generic[T_co]):
         # cannot have _SingleProcessDataLoaderIter for threaded implementation
         self.num_workers = num_workers
 
+
         # // Modified: additional parameters for the parallel fetching implementation
         if self.num_workers == 0 and fetch_impl == "threaded":
             self.num_workers = 1
@@ -268,6 +269,7 @@ class DataLoader(Generic[T_co]):
         self.timeout = timeout
         self.worker_init_fn = worker_init_fn
         self.multiprocessing_context = multiprocessing_context
+
 
         # Arg-check dataset related before checking samplers because we want to
         # tell users that iterable-style datasets are incompatible with custom
@@ -599,6 +601,7 @@ class _BaseDataLoaderIter(object):
         self._persistent_workers = loader.persistent_workers
         self._num_yielded = 0
         self._profile_name = "enumerate(DataLoader)#{}.__next__".format(self.__class__.__name__)
+        self.all_next = []
 
     def __iter__(self) -> "_BaseDataLoaderIter":
         return self
@@ -608,8 +611,13 @@ class _BaseDataLoaderIter(object):
         self._num_yielded = 0
         self._IterableDataset_len_called = loader._IterableDataset_len_called
 
+
     def _next_index(self):
-        return next(self._sampler_iter)  # may raise StopIteration
+        i = next(self._sampler_iter)
+        # print(f"Adding rec: {self._rcvd_idx}, sent: {self._send_idx}: {i}") 
+        self.all_next.append(i)
+        # print(f"Next: {i}")
+        return i  # may raise StopIteration
 
     def _next_data(self):
         raise NotImplementedError
@@ -1121,12 +1129,10 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
             self._index_queues.append(index_queue)
             self._workers.append(w)
             # for _ in range(self.loader.batch_pool // (self.loader.batch_size // self.loader.num_workers)):
-            # for _ in range(self._prefetch_factor * self._num_workers):
             # // Modified: start adding indexes to the fetch queue
             self._try_prime_index(i)
             yield w
-            # \\
-
+        self._top_up_workers()
     # \\
 
     def _reset(self, loader, first_iter=False):
@@ -1392,6 +1398,18 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
                 del self._task_info[idx]
                 return self._process_data(data)
 
+    def _top_up_workers(self):
+        # - num_workers because in the previous step we prime each worker with 1 batch
+        while self._tasks_outstanding < (self._prefetch_factor * self._num_workers) - self._num_workers:
+            for _ in range(self._num_workers):  # find the next active worker, if any
+                try:
+                    worker_id = next(self._worker_queue_idx_cycle)
+                    if self._workers_status[worker_id]:
+                        self._try_prime_index(worker_id)
+                except StopIteration:
+                    return
+            
+
     # // Modified: added function
     def _try_prime_index(self, id: int) -> None:
         """Starts putting indexes to the worker fetch queue. Otherwise, one
@@ -1407,17 +1425,18 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         try:
             index = self._next_index()
         except StopIteration:
-            return
+            raise StopIteration
         worker_queue_idx = id
         self._workers_status[id] = True
         self._index_queues[worker_queue_idx].put((self._send_idx, index))
         self._task_info[self._send_idx] = (worker_queue_idx,)
         self._tasks_outstanding += 1
         self._send_idx += 1
-
+        
     # \\
 
     def _try_put_index(self):
+        import threading
         assert self._tasks_outstanding < self._prefetch_factor * self._num_workers
         try:
             index = self._next_index()
@@ -1430,6 +1449,7 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
         else:
             # not found (i.e., didn't break)
             return
+        # print(f"Putting rec: {self._rcvd_idx}, sent: {self._send_idx} {threading.get_native_id()}")
         self._index_queues[worker_queue_idx].put((self._send_idx, index))
         self._task_info[self._send_idx] = (worker_queue_idx,)
         self._tasks_outstanding += 1
@@ -1437,7 +1457,12 @@ class _MultiProcessingDataLoaderIter(_BaseDataLoaderIter):
 
     def _process_data(self, data):
         self._rcvd_idx += 1
+        # // original -- slightly better
         self._try_put_index()
+        # \\
+        # // alternatve -- just slightly less performant
+        # self._top_up_workers()
+        # \\ 
         if isinstance(data, ExceptionWrapper):
             data.reraise()
         return data
