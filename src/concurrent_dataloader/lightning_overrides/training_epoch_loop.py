@@ -288,6 +288,14 @@ class TrainingEpochLoop(loops.Loop[_OUTPUTS_TYPE]):
             "start_time": time.time()
         }))
 
+            # //
+            logging.getLogger("timeline").debug(json.dumps({
+                        "item": "run_training_batch",
+                        "id": run_training_timeline_id,
+                        "end_time": time.time()
+                    }))
+            # \\
+
         self.batch_progress.increment_processed()
 
         # update non-plateau LR schedulers
