@@ -125,6 +125,12 @@ class TrainingEpochLoop(loops.Loop[_OUTPUTS_TYPE]):
 
     def reset(self) -> None:
         """Resets the internal state of the loop for a new run."""
+        reset_timeline_id = time.time() + self.global_step
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "reset_timeline",
+            "id": reset_timeline_id,
+            "start_time": time.time()
+        }))
         assert self.batch_loop is not None
         assert self.batch_loop.optimizer_loop is not None
         if self.restarting:
@@ -137,6 +143,11 @@ class TrainingEpochLoop(loops.Loop[_OUTPUTS_TYPE]):
             self.batch_loop.optimizer_loop.optim_progress.reset_on_run()
 
         self._outputs = []
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "reset_timeline",
+            "id": reset_timeline_id,
+            "end_time": time.time()
+        }))
 
     def on_run_start(self, data_fetcher: AbstractDataFetcher, **kwargs: Any) -> None:
         # hook
@@ -158,6 +169,24 @@ class TrainingEpochLoop(loops.Loop[_OUTPUTS_TYPE]):
         Raises:
             StopIteration: When the epoch is canceled by the user returning -1
         """
+        advance_timeline_id = time.time()
+        run_training_timeline_id = abs(hash(time.time())+ hash("run" + str(self.global_step)))
+        prerun_training_timeline_id = abs(hash(time.time())+ hash("prerun" + str(self.global_step)))
+        postrun_training_timeline_id = abs(hash(time.time())+ hash("postrun" + str(self.global_step)))
+        prep_training_timeline_id = abs(hash(time.time())+ hash("prep" + str(self.global_step)))
+
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "advance",
+            "id": advance_timeline_id,
+            "start_time": time.time()
+        }))
+
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "prerun",
+            "id": prerun_training_timeline_id,
+            "start_time": time.time()
+        }))
+
         if self.restarting and self._should_check_val_fx(self.batch_idx, self.batch_progress.is_last_batch):
             # skip training and run validation in `on_advance_end`
             return
@@ -190,13 +219,27 @@ class TrainingEpochLoop(loops.Loop[_OUTPUTS_TYPE]):
         # \\
 
         self.batch_progress.increment_ready()
-
         self.trainer.logger_connector.on_batch_start(batch_idx, batch)
+        self.batch_progress.increment_started()
+
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "prerun",
+            "id": prerun_training_timeline_id,
+            "end_time": time.time()
+        }))
+
 
         if batch is None:
             self._warning_cache.warn("train_dataloader yielded None. If this was on purpose, ignore this warning...")
             batch_output = []
         else:
+            
+            logging.getLogger("timeline").debug(json.dumps({
+                "item": "prep_training_batch",
+                "id": prep_training_timeline_id,
+                "start_time": time.time()
+            }))
+
             # hook
             response = self.trainer.call_hook("on_batch_start")
             if response == -1:
@@ -210,35 +253,41 @@ class TrainingEpochLoop(loops.Loop[_OUTPUTS_TYPE]):
                 if callable(model_fx) and is_param_in_hook_signature(model_fx, "dataloader_idx", explicit=True)
                 else {}
             )
-
-            # hook
+            # hook 
+            # <slow>
             response = self.trainer.call_hook("on_train_batch_start", batch, batch_idx, **extra_kwargs)
             if response == -1:
                 self.batch_progress.increment_processed()
                 raise StopIteration
+            # <slow/>    
 
-            self.batch_progress.increment_started()
+            logging.getLogger("timeline").debug(json.dumps({
+                "item": "prep_training_batch",
+                "id": prep_training_timeline_id,
+                "end_time": time.time()
+            }))
 
-            # //
-            run_training_timeline_id = abs(hash(frozenset(batch))) + time.time()
             logging.getLogger("timeline").debug(json.dumps({
                 "item": "run_training_batch",
                 "id": run_training_timeline_id,
                 "start_time": time.time()
             }))
-            # \\
 
             with self.trainer.profiler.profile("run_training_batch"):
                 batch_output = self.batch_loop.run(batch, batch_idx)
-
-            # //
-            logging.getLogger("timeline").debug(json.dumps({
-                        "item": "run_training_batch",
-                        "id": run_training_timeline_id,
-                        "end_time": time.time()
-                    }))
-            # \\
             
+            logging.getLogger("timeline").debug(json.dumps({
+            "item": "run_training_batch",
+            "id": run_training_timeline_id,
+            "end_time": time.time()
+        }))
+
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "postrun_training_batch",
+            "id": postrun_training_timeline_id,
+            "start_time": time.time()
+        }))
+
         self.batch_progress.increment_processed()
 
         # update non-plateau LR schedulers
@@ -260,9 +309,11 @@ class TrainingEpochLoop(loops.Loop[_OUTPUTS_TYPE]):
             if callable(model_fx) and is_param_in_hook_signature(model_fx, "dataloader_idx", explicit=True)
             else {}
         )
+        # <slow part>
         self.trainer.call_hook("on_train_batch_end", batch_end_outputs, batch, batch_idx, **extra_kwargs)
         self.trainer.call_hook("on_batch_end")
         self.trainer.logger_connector.on_batch_end()
+        # <slow part/>
 
         self.batch_progress.increment_completed()
 
@@ -273,6 +324,18 @@ class TrainingEpochLoop(loops.Loop[_OUTPUTS_TYPE]):
         # SAVE METRICS TO LOGGERS AND PROGRESS_BAR
         # -----------------------------------------
         self.trainer.logger_connector.update_train_step_metrics()
+
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "postrun_training_batch",
+            "id": postrun_training_timeline_id,
+            "end_time": time.time()
+        }))
+
+        logging.getLogger("timeline").debug(json.dumps({
+            "item": "advance",
+            "id": advance_timeline_id,
+            "end_time": time.time()
+        }))
 
     def on_advance_end(self):
         """Runs validation and Checkpointing if necessary.

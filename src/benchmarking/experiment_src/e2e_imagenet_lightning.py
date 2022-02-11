@@ -31,7 +31,8 @@ import torch.optim.lr_scheduler as lr_scheduler
 import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
-from benchmarking.misc.gpulogger import GPUSidecarLogger
+# from benchmarking.misc.gpulogger import GPUSidecarLogger
+from benchmarking.misc.gpulogger import GPUSidecarLoggerMs
 from benchmarking.misc.init_benchmarking import get_dataset
 from benchmarking.misc.init_benchmarking import init_benchmarking
 from benchmarking.misc.logging_configuration import initialize_logging
@@ -262,19 +263,21 @@ def main(args: Namespace) -> None:
     model = ImageNetLightningModel(train_dataloader=train_data_loader, val_dataloader=None, **vars(args))
 
     if torch.cuda.device_count() > 0:
-        gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
+        gpu_logger = GPUSidecarLoggerMs()
         gpu_logger.start()
 
     tb_logger = pl_loggers.TensorBoardLogger(f"{output_base_folder}/lightning/")
     # profiler = SimpleProfiler(filename=f"{output_base_folder}/lightning/{time.time()}.txt")
-    profiler = SimpleProfiler(dirpath=f"{output_base_folder}/lightning/", filename=f"{str(time.time())}")
+    # profiler = SimpleProfiler(dirpath=f"{output_base_folder}/lightning/", filename=f"{str(time.time())}")
+    profiler = None
     if torch.cuda.device_count() > 0:
         trainer = pl.Trainer.from_argparse_args(
             args,
             max_epochs=args.epochs,
             profiler=profiler,
+            checkpoint_callback=False,
             logger=tb_logger,
-            log_every_n_steps=5,
+            log_every_n_steps=1000,
             callbacks=[GPUStatsMonitor() if torch.cuda.device_count() > 0 else None],
         )
     else:
@@ -325,6 +328,10 @@ def run_cli():
 
     pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.advance = (
         training_epoch_loop.TrainingEpochLoop.advance
+    )
+
+    pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.reset = (
+        training_epoch_loop.TrainingEpochLoop.reset
     )
 
     parser = ImageNetLightningModel.add_model_specific_args(parent_parser)
