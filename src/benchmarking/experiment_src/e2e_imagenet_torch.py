@@ -17,7 +17,7 @@ import torch.optim
 import torch.utils.data.distributed
 import torchvision.models as models
 import torchvision.transforms as transforms
-# from benchmarking.misc.gpulogger import GPUSidecarLogger
+from benchmarking.misc.gpulogger import GPUSidecarLogger
 from benchmarking.misc.gpulogger import GPUSidecarLoggerMs
 from benchmarking.misc.init_benchmarking import get_dataset
 from benchmarking.misc.init_benchmarking import init_benchmarking
@@ -301,6 +301,7 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
     )
 
     if torch.cuda.device_count() > 0:
+        # gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
         gpu_logger = GPUSidecarLoggerMs()
         gpu_logger.start()
 

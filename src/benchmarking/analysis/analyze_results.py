@@ -3,6 +3,7 @@ import json
 import logging
 import re
 from datetime import timedelta
+from datetime import datetime
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Dict
@@ -20,7 +21,43 @@ from tensorboard.backend.event_processing.event_accumulator import EventAccumula
 from collections import defaultdict
 
 
-def plot_all(df: DataFrame, function_name: str, group_by: List[str], plot_max=True, log_scale=True, figsize=(50, 50)):
+def load_all_experiments(output_base_folder, base_folder, experiments_num, data_folder, subfolder):
+    results_data = []
+    for folder_index in range(1, experiments_num):
+        print(f"Working with {folder_index}")
+        data_folder_filter= base_folder + str(folder_index) + data_folder
+
+        # read data
+        df_dataloader = extract_timelines(output_base_folder, folder_filter=data_folder_filter)
+
+        # Get unique functions 
+        unique_functions = np.unique(df_dataloader["item_x"])
+        print(f"Unique functions: {unique_functions}")
+        unique_runs = np.unique(df_dataloader["run"])
+        
+        # extract GPU UTIL
+        df_gpuutil = extract_gpuutil(output_base_folder, folder_filter=data_folder_filter)
+
+        # Get data
+        returns_data = []
+        for run in sorted(unique_runs):
+            ds, _, epochs, samples, _, _ = get_metadata_info(output_base_folder / Path(base_folder+str(folder_index)+f"/{subfolder}/"+run))
+            df = df_dataloader[df_dataloader["run"]==run]
+            dfgpu = df_gpuutil[df_gpuutil["run"]==run]
+            df = df.drop_duplicates(subset="id", keep="first", inplace=False)
+            _, _, colors, lanes = get_colors_runs_and_lanes(df)
+            r = show_timelines_with_gpu(df, dfgpu, lanes, colors, run, False, False, False, 2, skip_plot=True)
+            r["run"]=run
+            returns_data.append(r)        
+
+        df_full = extract_pandas(output_base_folder, folder_filter=data_folder_filter)
+        r = pd.DataFrame.from_records(data=returns_data)
+        r = get_throughput(r, base_folder+str(folder_index)+f"/{subfolder}/", df_full, unique_runs, output_base_folder)
+        results_data.append(r)
+        
+    return results_data
+
+def plot_all(df: DataFrame, function_name: str, group_by: List[str], plot_max=True, log_scale=True, figsize=(50, 50), samples = -1):
     function_names = ["__getitem__", "fetch", "_worker_loop", "load_all", "benchmark_dataloader"]
     assert function_name in function_names
 
@@ -34,7 +71,7 @@ def plot_all(df: DataFrame, function_name: str, group_by: List[str], plot_max=Tr
     fig, ax = plt.subplots(num_rows, num_cols, figsize=figsize)
 
     for i, (key, df) in enumerate(df):
-        df_for_function_name = df[df["function_name"] == function_name]
+        df_for_function_name = df[df["function_name"] == function_name].drop_duplicates(subset=['time_start', 'time_end'], keep="first", inplace=False) 
         elapased = df_for_function_name["elapsed"]
         if len(elapased) == 0:
             continue
@@ -104,8 +141,8 @@ def plot_all(df: DataFrame, function_name: str, group_by: List[str], plot_max=Tr
             {"time_start": "min", "time_end": "max", "len": "sum", **{k: "first" for k in group_by}}
         )
         df_grouped["elapsed [s]"] = df_grouped["time_end"] - df_grouped["time_start"]
-        df_grouped["throughput [Bytes/s]"] = df_grouped["len"] / df_grouped["elapsed [s]"] / 10 ** 6
-        df_grouped["throughput [Mbit/s]"] = df_grouped["len"] / df_grouped["elapsed [s]"] / 10 ** 6 * 8
+        df_grouped["throughput [Bytes/s]"] = df_grouped["len"] / df_grouped["elapsed [s]"]                   
+        df_grouped["throughput [Mbit/s]"] = (df_grouped["len"] / df_grouped["elapsed [s]"] / (1024 * 1024)) * 8  
         df_grouped[["throughput [Mbit/s]"]].boxplot(ax=ax[pos_x, pos_y_start + 2])
         df_grouped[["elapsed [s]"]].boxplot(ax=ax[pos_x, pos_y_start + 3])
     # pretty output
@@ -141,6 +178,44 @@ def get_throughputs(df: DataFrame, group_by: List[str], row_filter: Dict[str, Li
     df["throughput [MBit/s]"] = df["downloaded data [MB]"] * 8 / df["total_elpased_time [s]"]
     return df
 
+def get_throughput(results, subfolder, df, unique_runs, output_base_folder):
+    Mbps = []
+    MBps = []
+    throughput = []
+    imgs = []
+    dl_total = []
+    # functions are logged twice, decorator loggs twice?
+    df = df.drop_duplicates(subset=['time_start', 'time_end'], keep="first", inplace=False) 
+    for run in sorted(unique_runs):
+        with (output_base_folder / subfolder / run / "metadata.json").open() as f:
+            metadata = json.load(f)
+#         print(run, metadata)
+
+        epochs = metadata["epochs"] if "epochs" in metadata.keys() else metadata["max_epochs"]
+        runtime = results[results["run"]==run]["runtime"].iloc(0)[0]
+
+        # we log bytes! -> b.getbuffer().nbytes or os.path.getsize
+        total_images = len(df[(df["run"]==run) & (df["function_name"]=="__getitem__")]["len"])
+        total_downloaded_bytes = df[(df["run"]==run) & (df["function_name"]=="__getitem__")]["len"].sum()
+        total_downloaded_bits = total_downloaded_bytes * 8
+        total_downloaded_Mbits = total_downloaded_bits / (1024*1024)
+        total_downloaded_MBytes = total_downloaded_bytes / (1024*1024)
+        # dl_byte_ps = total_downloaded_bytes / runtime
+
+        throughput.append(total_images / runtime)
+        imgs.append(total_images)
+
+        Mbps.append(total_downloaded_Mbits / runtime)            # bits (b)
+        MBps.append(total_downloaded_MBytes / runtime)           # bytes (B)
+        dl_total.append(total_downloaded_MBytes)   # downloaded (MB)
+
+    results["throughput"] = throughput
+    results["dl_MB"] = dl_total
+    results["imgs"] = imgs 
+    results["Mbit/s"] = Mbps
+    results["MB/s"] = MBps
+    results.sort_values(["runtime", "library"], ascending=True)
+    return results.drop(columns="run")
 
 def get_thread_stats(df: DataFrame, group_by: List[str], trace_level=5):
     s = (
@@ -186,14 +261,16 @@ def plot_throughput_per_storage(df, group_by: List[str]):
 
     x_label = group_by[1]
 
-    df_for_function_name = df[df["function_name"] == "__getitem__"]
+    df_for_function_name = df[df["function_name"] == "__getitem__"].drop_duplicates(subset=['time_start', 'time_end'], keep="first", inplace=False) 
     df_for_function_name["request_time"] = df_for_function_name["time_end"] - df_for_function_name["time_start"]
     nodes = set(df_for_function_name["node"].drop_duplicates().tolist())
     df_grouped_by_run = df_for_function_name.groupby(["run"]).agg(
         {"time_start": "min", "time_end": "max", "len": "sum", **{k: "first" for k in group_by}}
     )
     df_grouped_by_run["runtime"] = df_grouped_by_run["time_end"] - df_grouped_by_run["time_start"]
-    df_grouped_by_run["throughput [Mbit/s]"] = df_grouped_by_run["len"] / df_grouped_by_run["runtime"] / 10 ** 6 * 8
+    # df_grouped_by_run["throughput [Mbit/s]"] = df_grouped_by_run["len"] / df_grouped_by_run["runtime"] / 10 ** 6 * 8
+    df_grouped_by_run["throughput [Mbit/s]"] = (df_grouped_by_run["len"] / df_grouped_by_run["runtime"] / (1024 * 1024)) * 8
+    
 
     # sum of all runtimes and all downloaded data by summer over runs
     df_aggregated_over_runs = df_grouped_by_run.groupby(group_by).agg(
@@ -208,7 +285,8 @@ def plot_throughput_per_storage(df, group_by: List[str]):
 
     # https://en.wikipedia.org/wiki/Data-rate_units#Megabit_per_second
     df_aggregated_over_runs["throughput [Mbit/s]"] = (
-        df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / 10 ** 6 * 8
+        # df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / 10 ** 6 * 8
+        (df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / (1024 * 1024)) * 8
     )
     df_aggregated_over_runs["min_throughput"] = df_aggregated_over_runs["min_throughput"]
 
@@ -264,7 +342,7 @@ def plot_throughput_per_storage(df, group_by: List[str]):
             }
         )
 
-    fig.legend(handlelength=5)
+    fig.legend(loc="lower center",  bbox_to_anchor=(0.5, -0.2, 0, 0))
  
     ax1.set_ylabel("throughput [Mbit/s]")
     ax1.set_xlabel(f"{x_label} [#processes]")
@@ -288,7 +366,8 @@ def plot_throughput_per_storage2(df, group_by: List[str]):
     )
     runtime = df_grouped_by_run["time_end"] - df_grouped_by_run["time_start"]
     df_grouped_by_run["runtime"] = runtime
-    throughput = df_grouped_by_run["len"] / df_grouped_by_run["runtime"] / 10 ** 6 * 8
+    # throughput = df_grouped_by_run["len"] / df_grouped_by_run["runtime"] / 10 ** 6 * 8
+    throughput = (df_grouped_by_run["len"] / df_grouped_by_run["runtime"] / (1024 * 1024)) * 8
     df_grouped_by_run["throughput [Mbit/s]"] = throughput
 
     # sum of all runtimes and all downloaded data by summer over runs
@@ -304,7 +383,8 @@ def plot_throughput_per_storage2(df, group_by: List[str]):
 
     # https://en.wikipedia.org/wiki/Data-rate_units#Megabit_per_second
     df_aggregated_over_runs["throughput [Mbit/s]"] = (
-        df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / 10 ** 6 * 8
+        # df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / 10 ** 6 * 8
+        (df_aggregated_over_runs["len"] / df_aggregated_over_runs["runtime"] / (1024 * 1024)) * 8
     )
     df_aggregated_over_runs["min_throughput"] = df_aggregated_over_runs["min_throughput"]
 
@@ -529,37 +609,64 @@ def extract_gpu_utilization(output_base_folder: Path, folder_filter: str = "**",
     return data
 
 
-def extract_gpuutil(
-    output_base_folder: Path, folder_filter: str = "**", filter_by_metadata: Dict[str, List[str]] = None,
-):
+from datetime import datetime
+def extract_gpuutil(output_base_folder: Path, 
+                    folder_filter: str = "**", 
+                    filter_by_metadata: Dict[str, List[str]] = None,
+                    ms = False,
+                    skip = -1):
     files = list(output_base_folder.rglob(f"{folder_filter}/gpuutil-*.log"))
     data = []
+    header = []
     for working_file_path in tqdm.tqdm(files, total=len(files)):
         results = parse_results_log(working_file_path)
         if len(results) == 0:
             continue
-        header = []
-        header.append("timestamp")
-        for i in results[0]["gpu_data"]:
-            header.append(f"gpu_util_{i}")
-            header.append(f"mem_util_{i}")
-        header.append("run")
-        lines = []
-        for result in results:
-            line = []
-            line.append(result["timestamp"])
-            for item in result["gpu_data"]:
-                line.append(result["gpu_data"][item]["gpu_util"])
-                line.append(result["gpu_data"][item]["mem_util"])
-            line.append(working_file_path.parent.name)
-            lines.append(line)
+        if ms:
+            results = results[skip:]
+            if not header:
+                format_string = "%Y/%m/%d %H:%M:%S.%f"
+                for i in results[0]["gpu_data"]:
+                    header.append(f"gpu_util_{i}")
+                    header.append(f"mem_util_{i}")
+                    header.append(f"timestamp_{i}")
+                header.append("run")
+            lines = []
+            for result in results:
+                line = []
+                for item in result["gpu_data"]:
+                    line.append(result["gpu_data"][item]["gpu_util"])
+                    line.append(result["gpu_data"][item]["mem_util"])
+                    time = result["gpu_data"][item]["timestamp"]
+                    time = datetime.strptime(time.strip(), format_string)
+                    line.append(time.timestamp())
+                line.append(working_file_path.parent.name)
+                lines.append(line)
+        else:
+            if not header:
+                header.append("timestamp")
+                for i in results[0]["gpu_data"]:
+                    header.append(f"gpu_util_{i}")
+                    header.append(f"mem_util_{i}")
+                header.append("run")
+            lines = []
+            for result in results:
+                line = []
+                line.append(result["timestamp"])
+                for item in result["gpu_data"]:
+                    line.append(result["gpu_data"][item]["gpu_util"])
+                    line.append(result["gpu_data"][item]["mem_util"])
+                line.append(working_file_path.parent.name)
+                lines.append(line)
         results = pd.DataFrame.from_records(lines)
         data.append(results)
     df = pd.concat(data)
+#     print(header)
     df.columns = header
     df.groupby
-    df.sort_values(["timestamp"], ascending=True)
+#     df.sort_values(["timestamp"], ascending=True)
     return df
+
 
 
 def extract_profiling(output_base_folder: Path, folder_filter: str = "**", device_id=0):
@@ -653,56 +760,110 @@ def show_timelines(df, run, lanes, colors, flat=False, zoom=False, zoom_epochs=1
     )
     plt.show()
 
+def get_metadata_info(path):
+    import math 
+    with (path / "metadata.json").open() as f:
+        metadata = json.load(f)
 
-def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_gpu=False, zoom=False, zoom_epochs=1, gpu_index="2"):
-    fig, ax = plt.subplots(figsize=(30, 25))
+    batch_per_epoch = math.ceil(metadata["dataset_limit"] / metadata["batch_size"])
+    bs = metadata["batch_size"]
+    ds = metadata["dataset_limit"]
+    epochs = metadata["epochs"] if "epochs" in metadata.keys() else metadata["max_epochs"]
+
+    print("Dataset: ", ds)
+    print("Batch size:", bs)
+    print("Epochs: ", epochs)
+    print("Images total: ", ds * epochs)
+    print("Batches per epoch", batch_per_epoch)
+    print("Images total (rounded): ", batch_per_epoch * bs * epochs)
+
+    return ds, bs, epochs, ds * epochs, batch_per_epoch, batch_per_epoch * bs * epochs
+
+def get_colors_runs_and_lanes(df):
+    named_colors = ["green", "orange", "lawngreen", "black", "gray", "teal"]
+    unique_functions = np.unique(df["item_x"])
+
+    # ensure that special functions (same for both Lightning and Torch approach) are always plotted in the same color
+    colors = {}
+    special_functions = ["batch", "training_batch_to_device", "run_training_batch"]
+    unique_functions = np.setdiff1d(unique_functions, special_functions)
+
+    for i, color in zip(special_functions, ["red", "magenta", "blue"]):
+        colors[str(i)] = color
+    for i, color in zip(unique_functions, named_colors):
+        colors[str(i)] = color    
+
+    lanes={}
+    for i, lane in zip(unique_functions, range(len(unique_functions))):
+        lanes[str(i)] = lane
+    unique_runs = np.unique(df["run"])
+    unique_functions = [*unique_functions, *special_functions]
+    return unique_runs, unique_functions, colors, lanes
+
+def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_gpu=False, zoom=False, zoom_epochs=1, gpu_index="2", skip_plot=False, ms=False):
+    fig, ax = None, None
+    if not skip_plot:
+        fig, ax = plt.subplots(figsize=(30, 25))
     plt.rcParams.update({"font.size": 18})
     start = min(df["start_time_x"])
     end = max(df["end_time_y"])
-    gpu_start = min(gpu_util["timestamp"])
+    ts = "timestamp"
+    if ms:
+        ts = f"timestamp_{gpu_index}"
+    print(ts, ms)
+    gpu_start = min(gpu_util[ts])
 
     total_runtime = end - start
     number_of_epochs = 20
 
     if zoom:
         df = df[df["start_time_x"] < start + ((total_runtime / number_of_epochs) * zoom_epochs)]
-        gpu_util = gpu_util[gpu_util["timestamp"] < gpu_start + ((total_runtime / number_of_epochs) * zoom_epochs)]
+        gpu_util = gpu_util[gpu_util[ts] < gpu_start + ((total_runtime / number_of_epochs) * zoom_epochs)]
 
     lane = 0
-    for _, row in df.sort_values(["start_time_x"], ascending=True).iterrows():
-        duration = row["end_time_y"] - row["start_time_x"]
-        x1 = row["start_time_x"] - start
-        if duration < 0.15:
-            duration = 0.2
-        x2 = x1 + duration
-        if not flat:
-            lane += 10
-        else:
-            lane = lanes[row["item_x"]]
-        ax.plot([x1, x2], [lane, lane], color=colors[row["item_x"]], label=row["item_x"], linewidth=3)
-
-    ax.set_xlabel("Experiment duration (S)", loc="right")
-    ax.set_ylabel("Operation activity lane", loc="center")
     filename = run.split("_")
+    if not skip_plot:
+        for _, row in df.sort_values(["start_time_x"], ascending=True).iterrows():
+            duration = row["end_time_y"] - row["start_time_x"]
+            x1 = row["start_time_x"] - start
+            if duration < 0.15:
+                duration = 0.2
+            x2 = x1 + duration
+            if not flat:
+                lane += 10
+            else:
+                lane = lanes[row["item_x"]]
+            ax.plot([x1, x2], [lane, lane], color=colors[row["item_x"]], label=row["item_x"], linewidth=3)
 
-    ax.legend()
-    ax.grid(linestyle="--", which="both")
+        ax.set_xlabel("Experiment duration (S)", loc="right")
+        ax.set_ylabel("Operation activity lane", loc="center")
 
-    handles, labels = plt.gca().get_legend_handles_labels()
-    by_label = dict(zip(labels, handles))
+        ax.legend()
+        ax.grid(linestyle="--", which="both")
 
-    # Put a legend below current axis
-    ax.legend(
-        by_label.values(),
-        by_label.keys(),
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.05),
-        fancybox=True,
-        shadow=True,
-        ncol=5,
-    )
+        handles, labels = plt.gca().get_legend_handles_labels()
+        by_label = dict(zip(labels, handles))
+
+        # Put a legend below current axis
+        ax.legend(
+            by_label.values(),
+            by_label.keys(),
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.05),
+            fancybox=True,
+            shadow=True,
+            ncol=5,
+        )
 
     gpu_util_mean_no_zeros = 0
+    gpu_util_zeros = 0
+    mem_util_mean_no_zeros = 0
+    mem_util_mean = 0
+    
+    gpu_util_zeros = (len(gpu_util[gpu_util[f"gpu_util_{gpu_index}"] == 0][f"gpu_util_{gpu_index}"]) / len(gpu_util[f"gpu_util_{gpu_index}"])) * 100
+    gpu_util_mean_no_zeros = np.mean(gpu_util[gpu_util[f"gpu_util_{gpu_index}"] > 0][f"gpu_util_{gpu_index}"])
+    mem_util_mean = np.mean(gpu_util[f"mem_util_{gpu_index}"])
+    mem_util_mean_no_zeros = np.mean(gpu_util[gpu_util[f"mem_util_{gpu_index}"] > 0][f"mem_util_{gpu_index}"])
 
     if show_gpu:
         ax2 = ax.twinx()
@@ -711,14 +872,10 @@ def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_g
         r"{\fontsize{50pt}{3em}\selectfont{}a}{\fontsize{20pt}{3em}\selectfont{}N"
         ax2.set_ylim([-3, 103])
         gpu_events = []
-        for i in gpu_util["timestamp"]:
+        for i in gpu_util[ts]:
             gpu_events.append(i - start)
         ax2.plot(gpu_events, gpu_util[f"gpu_util_{gpu_index}"], color="cyan", linestyle="--", linewidth=2)
         ax2.plot(gpu_events, gpu_util[f"mem_util_{gpu_index}"], color="maroon", linestyle="--", linewidth=2)
-        gpu_util_zeros = (len(gpu_util[gpu_util[f"gpu_util_{gpu_index}"] == 0][f"gpu_util_{gpu_index}"]) / len(gpu_util[f"gpu_util_{gpu_index}"])) * 100
-        gpu_util_mean_no_zeros = np.mean(gpu_util[gpu_util[f"gpu_util_{gpu_index}"] > 0][f"gpu_util_{gpu_index}"])
-        mem_util_mean = np.mean(gpu_util[f"mem_util_{gpu_index}"])
-        mem_util_mean_no_zeros = np.mean(gpu_util[gpu_util[f"mem_util_{gpu_index}"] > 0][f"mem_util_{gpu_index}"])
         ax2.plot(
             gpu_events, [gpu_util_mean_no_zeros] * len(gpu_events), label="GPU Util Mean", linewidth=2, color="cyan"
         )
@@ -728,17 +885,22 @@ def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_g
         print(gpu_util_mean_no_zeros, mem_util_mean_no_zeros)
         ax2.legend()
 
-    ax.set_title(
-        f"Total runtime per operation \n Implementation: {filename[9]},"
-        # f" use cache: {filename[8]}, "
-        f" batch size: {filename[5]}, "
-        f" library: {filename[3]}, "
-        f"\n GPU unused: {round(gpu_util_zeros, 2)} %, "
-        f" mean GPU usage: {round(gpu_util_mean_no_zeros, 2)} %",
-        loc="center",
-    )
+    gpu_util = ""
+    if show_gpu:
+        gpu_util = f"GPU unused: {round(gpu_util_zeros, 2)} %, mean GPU usage: {round(gpu_util_mean_no_zeros, 2)} %",
+ 
+    if not skip_plot:
+        ax.set_title(
+            f"Total runtime per operation \n Implementation: {filename[9]},"
+            # f" use cache: {filename[8]}, "
+            f" batch size: {filename[5]}, "
+            f" library: {filename[3]}, "
+            f"{gpu_util}",
+            loc="center",
+        )
 
     plt.show()
+ 
     return {
         "runtime": end - start,
         "gpu_util_zero": gpu_util_zeros,
@@ -751,29 +913,29 @@ def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_g
     }
 
 
-def get_gpu_stats(df, gpu_util, run, flat=False, show_gpu=False, zoom=False, zoom_epochs=1):
-    start = min(df["start_time_x"])
-    end = max(df["end_time_y"])
-    filename = run.split("_")
+# def get_gpu_stats(df, gpu_util, run, flat=False, show_gpu=False, zoom=False, zoom_epochs=1):
+#     start = min(df["start_time_x"])
+#     end = max(df["end_time_y"])
+#     filename = run.split("_")
 
-    gpu_events = []
-    for i in gpu_util["timestamp"]:
-        gpu_events.append(i - start)
-    gpu_util_zeros = (len(gpu_util[gpu_util["gpu_util_2"] == 0]["gpu_util_2"]) / len(gpu_util["gpu_util_2"])) * 100
-    gpu_util_mean_no_zeros = np.mean(gpu_util[gpu_util["gpu_util_2"] > 0]["gpu_util_2"])
-    mem_util_mean = np.mean(gpu_util["mem_util_2"])
-    mem_util_mean_no_zeros = np.mean(gpu_util[gpu_util["mem_util_2"] > 0]["mem_util_2"])
+#     gpu_events = []
+#     for i in gpu_util["timestamp"]:
+#         gpu_events.append(i - start)
+#     gpu_util_zeros = (len(gpu_util[gpu_util["gpu_util_2"] == 0]["gpu_util_2"]) / len(gpu_util["gpu_util_2"])) * 100
+#     gpu_util_mean_no_zeros = np.mean(gpu_util[gpu_util["gpu_util_2"] > 0]["gpu_util_2"])
+#     mem_util_mean = np.mean(gpu_util["mem_util_2"])
+#     mem_util_mean_no_zeros = np.mean(gpu_util[gpu_util["mem_util_2"] > 0]["mem_util_2"])
 
-    return {
-        "runtime": end - start,
-        "gpu_util_zero": gpu_util_zeros,
-        "gpu_util_mean_no_zeros": gpu_util_mean_no_zeros,
-        "mem_util_mean": mem_util_mean,
-        "mem_util_mean_no_zeros": mem_util_mean_no_zeros,
-        "implementation": filename[9],
-        "cache": filename[8],
-        "library": filename[3],
-    }
+#     return {
+#         "runtime": end - start,
+#         "gpu_util_zero": gpu_util_zeros,
+#         "gpu_util_mean_no_zeros": gpu_util_mean_no_zeros,
+#         "mem_util_mean": mem_util_mean,
+#         "mem_util_mean_no_zeros": mem_util_mean_no_zeros,
+#         "implementation": filename[9],
+#         "cache": filename[8],
+#         "library": filename[3],
+#     }
 
 
 def plot_histogram(throughput, title):
