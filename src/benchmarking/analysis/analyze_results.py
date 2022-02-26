@@ -214,7 +214,6 @@ def get_throughput(results, subfolder, df, unique_runs, output_base_folder):
     results["imgs"] = imgs 
     results["Mbit/s"] = Mbps
     results["MB/s"] = MBps
-    results.sort_values(["runtime", "library"], ascending=True)
     return results.drop(columns="run")
 
 def get_thread_stats(df: DataFrame, group_by: List[str], trace_level=5):
@@ -301,7 +300,8 @@ def plot_throughput_per_storage(df, group_by: List[str]):
         }
     )
 
-    fig, ax1 = plt.subplots(figsize=(50, 10))
+    # fig, ax1 = plt.subplots(figsize=(50, 10))
+    fig, ax1 = plt.subplots()
     ax1.set_ylim([0, max(200, df_grouped_by_run["throughput [Mbit/s]"].max())])
     ax2 = ax1.twinx()
     cmap = plt.cm.get_cmap("Set1")
@@ -800,11 +800,15 @@ def get_colors_runs_and_lanes(df):
     unique_functions = [*unique_functions, *special_functions]
     return unique_runs, unique_functions, colors, lanes
 
-def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_gpu=False, zoom=False, zoom_epochs=1, gpu_index="2", skip_plot=False, ms=False):
+def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_gpu=False, zoom=False, 
+                            zoom_epochs=1, gpu_index="2", skip_plot=False, ms=False, fig_params=None, skip_title=False):
     fig, ax = None, None
     if not skip_plot:
         fig, ax = plt.subplots(figsize=(30, 25))
-    plt.rcParams.update({"font.size": 18})
+    if fig_params is None:
+        plt.rcParams.update({"font.size": 18})
+    else:
+        plt.rcParams.update(fig_params)
     start = min(df["start_time_x"])
     end = max(df["end_time_y"])
     ts = "timestamp"
@@ -910,6 +914,7 @@ def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_g
         "implementation": filename[9],
         "cache": filename[8],
         "library": filename[3],
+        "fig": fig,
     }
 
 

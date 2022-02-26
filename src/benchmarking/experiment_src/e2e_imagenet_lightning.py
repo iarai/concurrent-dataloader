@@ -263,13 +263,14 @@ def main(args: Namespace) -> None:
     model = ImageNetLightningModel(train_dataloader=train_data_loader, val_dataloader=None, **vars(args))
 
     if torch.cuda.device_count() > 0:
-        # gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
-        gpu_logger = GPUSidecarLoggerMs()
+        gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
+        # gpu_logger = GPUSidecarLoggerMs()
         gpu_logger.start()
 
     tb_logger = pl_loggers.TensorBoardLogger(f"{output_base_folder}/lightning/")
-    # profiler = SimpleProfiler(dirpath=f"{output_base_folder}/lightning/", filename=f"{str(time.time())}")
-    profiler = None
+    profiler = SimpleProfiler(dirpath=f"{output_base_folder}/lightning/", filename=f"{str(time.time())}")
+    # profiler = None
+    log_every = 5 
     if torch.cuda.device_count() > 0:
         trainer = pl.Trainer.from_argparse_args(
             args,
@@ -277,12 +278,12 @@ def main(args: Namespace) -> None:
             profiler=profiler,
             checkpoint_callback=False,
             logger=tb_logger,
-            log_every_n_steps=1000,
+            log_every_n_steps=log_every,
             callbacks=[GPUStatsMonitor() if torch.cuda.device_count() > 0 else None],
         )
     else:
         trainer = pl.Trainer.from_argparse_args(
-            args, max_epochs=args.epochs, profiler=profiler, logger=tb_logger, log_every_n_steps=1000
+            args, max_epochs=args.epochs, profiler=profiler, logger=tb_logger, log_every_n_steps=log_every
         )
 
     start_train(args, model, trainer)

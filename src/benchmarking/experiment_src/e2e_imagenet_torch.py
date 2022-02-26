@@ -301,8 +301,8 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
     )
 
     if torch.cuda.device_count() > 0:
-        # gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
-        gpu_logger = GPUSidecarLoggerMs()
+        gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
+        # gpu_logger = GPUSidecarLoggerMs()
         gpu_logger.start()
 
     for epoch in range(args.start_epoch, args.epochs):
