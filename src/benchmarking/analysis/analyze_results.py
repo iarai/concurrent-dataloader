@@ -830,8 +830,8 @@ def show_timelines_with_gpu(df, gpu_util, lanes, colors, run, flat=False, show_g
         for _, row in df.sort_values(["start_time_x"], ascending=True).iterrows():
             duration = row["end_time_y"] - row["start_time_x"]
             x1 = row["start_time_x"] - start
-            if duration < 0.15:
-                duration = 0.2
+            # if duration < 0.15:
+            #     duration = 0.2
             x2 = x1 + duration
             if not flat:
                 lane += 10

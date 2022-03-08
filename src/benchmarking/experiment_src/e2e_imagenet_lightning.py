@@ -42,6 +42,7 @@ from concurrent_dataloader.dataloader_mod.worker import _worker_loop as _worker_
 from concurrent_dataloader.dataloader_vanilla.dataloader import DataLoader as DataLoaderVanilla
 from concurrent_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
 from concurrent_dataloader.lightning_overrides import training_epoch_loop
+from concurrent_dataloader.lightning_overrides import training_batch_loop
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import GPUStatsMonitor
 from pytorch_lightning.core import LightningModule
@@ -263,14 +264,14 @@ def main(args: Namespace) -> None:
     model = ImageNetLightningModel(train_dataloader=train_data_loader, val_dataloader=None, **vars(args))
 
     if torch.cuda.device_count() > 0:
-        gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
-        # gpu_logger = GPUSidecarLoggerMs()
+        # gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
+        gpu_logger = GPUSidecarLoggerMs()
         gpu_logger.start()
 
     tb_logger = pl_loggers.TensorBoardLogger(f"{output_base_folder}/lightning/")
-    profiler = SimpleProfiler(dirpath=f"{output_base_folder}/lightning/", filename=f"{str(time.time())}")
-    # profiler = None
-    log_every = 5 
+    # profiler = SimpleProfiler(dirpath=f"{output_base_folder}/lightning/", filename=f"{str(time.time())}")
+    profiler = None
+    log_every = 1000
     if torch.cuda.device_count() > 0:
         trainer = pl.Trainer.from_argparse_args(
             args,
@@ -329,6 +330,10 @@ def run_cli():
 
     pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.advance = (
         training_epoch_loop.TrainingEpochLoop.advance
+    )
+
+    pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop.advance = (
+        training_batch_loop.TrainingBatchLoop.advance
     )
 
     pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.reset = (

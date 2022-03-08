@@ -301,8 +301,8 @@ def main_worker(gpu, ngpus_per_node, args):  # noqa
     )
 
     if torch.cuda.device_count() > 0:
-        gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
-        # gpu_logger = GPUSidecarLoggerMs()
+        # gpu_logger = GPUSidecarLogger(refresh_rate=0.5, max_runs=-1)
+        gpu_logger = GPUSidecarLoggerMs()
         gpu_logger.start()
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -340,6 +340,11 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
             json.dumps({"item": "training_batch_to_device", "id": batch_timeline_id, "start_time": time.time()})
         )
 
+        # //
+        # https://pytorch.org/docs/stable/notes/cuda.html#cuda-memory-pinning
+        # non_blocking uses another part of GPU to perform async data transfer
+        # currently, not doing anything (no difference True/False)
+        # \\
         if args.gpu is not None:
             images = images.cuda(args.gpu, non_blocking=True)
         if torch.cuda.is_available():

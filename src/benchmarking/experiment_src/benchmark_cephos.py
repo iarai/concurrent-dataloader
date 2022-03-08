@@ -83,7 +83,7 @@ class Downloader:
             self.aws_secret_access_key = "B2M1wP79AjZselDkTYZHYFppaemhiIiSesO0Luov"
             self.endpoint_url = "http://10.0.2.1:80"
             self.index_file = Path("../credentials_and_indexes/index-ceph-train.json")
-        elif mode == "s3":
+        elif mode == "s3": 
         # AWS
             self.aws_access_key_id = "AKIA3WN63774XSV2B6TZ"
             self.aws_secret_access_key = "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"
@@ -183,7 +183,7 @@ def main(dl_mode):
     mode = modes[5]
     pool_size = 5
 
-    for file_num in [5000] * 5:
+    for file_num in [65000] * 5:
         print(f"Running with: {file_num}, concurrency mode: {mode}, storage: {dl_mode}")
         dl_details = []
         t_start = time.time()
