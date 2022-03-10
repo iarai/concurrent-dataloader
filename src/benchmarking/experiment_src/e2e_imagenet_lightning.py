@@ -43,11 +43,12 @@ from concurrent_dataloader.dataloader_vanilla.dataloader import DataLoader as Da
 from concurrent_dataloader.dataloader_vanilla.worker import _worker_loop as _worker_loop_vanilla
 from concurrent_dataloader.lightning_overrides import training_epoch_loop
 from concurrent_dataloader.lightning_overrides import training_batch_loop
+from concurrent_dataloader.lightning_overrides import optimizer_loop
 from pytorch_lightning import loggers as pl_loggers
 from pytorch_lightning.callbacks import GPUStatsMonitor
 from pytorch_lightning.core import LightningModule
 from pytorch_lightning.profiler import SimpleProfiler
-
+import json
 
 class ImageNetLightningModel(LightningModule):
     """
@@ -84,6 +85,7 @@ class ImageNetLightningModel(LightningModule):
         self._train_dataloader = train_dataloader
         self._val_dataloader = val_dataloader
         self.model = models.__dict__[self.arch](pretrained=self.pretrained)
+
 
     def forward(self, x):  # noqa
         return self.model(x)
@@ -334,6 +336,14 @@ def run_cli():
 
     pytorch_lightning.loops.batch.training_batch_loop.TrainingBatchLoop.advance = (
         training_batch_loop.TrainingBatchLoop.advance
+    )
+
+    pytorch_lightning.loops.optimization.optimizer_loop.OptimizerLoop._optimizer_step = (
+        optimizer_loop.OptimizerLoop._optimizer_step
+    )
+
+    pytorch_lightning.loops.optimization.optimizer_loop.OptimizerLoop._run_optimization = (
+        optimizer_loop.OptimizerLoop._run_optimization
     )
 
     pytorch_lightning.loops.epoch.training_epoch_loop.TrainingEpochLoop.reset = (

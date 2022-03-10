@@ -1,7 +1,7 @@
 # for fetch_impl in "threaded" "asyncio" "vanilla" ; do
 #   for storage in "scratch" "s3"; do
 #     for implementation in "../../experiment_src/e2e_imagenet_torch.py" "../../experiment_src/e2e_imagenet_lightning.py" ; do
-#         python3 "${implementation}" --output_base_folder "../../../../benchmark_output/motivation/last_run_2" \
+#         python3 "${implementation}" --output_base_folder "../../../../benchmark_output/motivation/last_run_3" \
 #         --dataset "${storage}" \
 #         --num-fetch-workers 16 \
 #         --num-workers 4 \
@@ -19,8 +19,9 @@
 
 for fetch_impl in "threaded"; do
   for storage in "scratch"; do
-    for implementation in "../../experiment_src/e2e_imagenet_lightning.py" ; do
-        python3 "${implementation}" --output_base_folder "../../../../benchmark_output/motivation/last_run_3" \
+    # for implementation in "../../experiment_src/e2e_imagenet_lightning.py" ; do
+    for implementation in "../../experiment_src/e2e_imagenet_torch.py" ; do
+        python3 "${implementation}" --output_base_folder "../../../../benchmark_output/motivation/last_run_tmp" \
         --dataset "${storage}" \
         --num-fetch-workers 16 \
         --num-workers 4 \

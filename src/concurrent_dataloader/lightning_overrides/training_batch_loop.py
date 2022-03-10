@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Any, List, Optional, Union
-
+# //
+import json
+import logging
+import time
+# \\
 from deprecate import void
 from torch import Tensor
 
@@ -23,10 +27,6 @@ from pytorch_lightning.loops.optimization.optimizer_loop import _OUTPUTS_TYPE as
 from pytorch_lightning.loops.optimization.optimizer_loop import OptimizerLoop
 from pytorch_lightning.loops.utilities import _get_active_optimizers
 from pytorch_lightning.trainer.supporters import TensorRunningAccum
-
-# //
-from benchmarking.misc.time_helper import stopwatch
-# \\
 
 _OUTPUTS_TYPE = List[Union[_OPTIMIZER_LOOP_OUTPUTS_TYPE, _MANUAL_LOOP_OUTPUTS_TYPE]]
 
@@ -73,7 +73,6 @@ class TrainingBatchLoop(Loop[_OUTPUTS_TYPE]):
         void(batch_idx)
         self._remaining_splits = list(enumerate(self._tbptt_split_batch(batch)))
 
-    @stopwatch(trace_name="(7)_batch_advance", trace_level=7)
     def advance(self, batch, batch_idx):
         """Runs the train step together with optimization (if necessary) on the current batch split.
 
