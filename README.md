@@ -105,33 +105,3 @@ s3_dataset = S3Dataset.index_all(
    index_file_upload_path="s3://scratch/neun_t4c/t4c21-index.json"
 )
 ```
-
-## Pre-commit checkup
-
-`pre-commit run --all`
-
-
-
-
-## sync tu -> gluster
-```
-rsync -Wuva ~/workspaces/storage-benchmarking/benchmark_output/ christian.eichenberger@lnx-slim-1.lan.iarai.ac.at:/iarai/work/logs/storage_benchmarking/
-```
-
-## Analysis
-```
-sshfs christian.eichenberger@lnx-slim-1.lan.iarai.ac.at:/iarai /iarai
-
-cd src
-export PYTHONPATH=$PWD
-jupyter notebook analysis/Analysis.ipynb
-
-```
-
-## Citation
-
-Cite as:
-
-```commandline
-bib... 
-```
