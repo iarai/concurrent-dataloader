@@ -105,3 +105,16 @@ s3_dataset = S3Dataset.index_all(
    index_file_upload_path="s3://scratch/neun_t4c/t4c21-index.json"
 )
 ```
+
+## Cite
+Please cite this repo along with our [technical report](https://arxiv.org/abs/2211.04908):
+```
+@misc{svogor2022profiling,
+      title={Profiling and Improving the PyTorch Dataloader for high-latency Storage: A Technical Report}, 
+      author={Ivan Svogor and Christian Eichenberger and Markus Spanring and Moritz Neun and Michael Kopp},
+      year={2022},
+      eprint={2211.04908},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+```
